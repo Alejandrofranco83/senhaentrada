@@ -60,6 +60,11 @@ async function createTicket(serviceId, operatorId = null) {
   }
 }
 
+// Get initials from name
+function getInitials(name) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
 // Show operator selection screen
 async function showOperatorScreen() {
   const res = await fetch('/api/operators/available');
@@ -68,11 +73,16 @@ async function showOperatorScreen() {
   const list = document.getElementById('operatorList');
   list.innerHTML = '';
 
-  // Individual operators
+  // Individual operators with photo
   for (const op of operators) {
     const btn = document.createElement('button');
     btn.className = 'operator-btn';
-    btn.textContent = op.name;
+
+    const photoHtml = op.photo
+      ? `<img class="op-photo" src="${op.photo}" alt="${op.name}">`
+      : `<div class="op-initials">${getInitials(op.name)}</div>`;
+
+    btn.innerHTML = `${photoHtml}<div class="op-name">${op.name}</div>`;
     btn.onclick = () => createTicket(specificServiceId, op.id);
     list.appendChild(btn);
   }
@@ -81,11 +91,25 @@ async function showOperatorScreen() {
   const firstBtn = document.createElement('button');
   firstBtn.className = 'operator-btn first-available';
   firstBtn.innerHTML = `
-    <div style="font-weight:700;">Primero disponible</div>
-    <div style="font-size:0.9rem;opacity:0.8;margin-top:4px;">Primeiro disponível</div>
+    <div class="op-initials" style="background:var(--success);">⚡</div>
+    <div class="op-name">Primero disponible<br><small style="opacity:0.7;">Primeiro disponível</small></div>
   `;
   firstBtn.onclick = () => createTicket(specificServiceId, null);
   list.appendChild(firstBtn);
+
+  // Calculate grid: adjust columns/rows to fill screen
+  const total = operators.length + 1; // +1 for "first available"
+  let cols;
+  if (total <= 2) cols = 2;
+  else if (total <= 3) cols = 3;
+  else if (total <= 4) cols = 2;
+  else if (total <= 6) cols = 3;
+  else if (total <= 8) cols = 4;
+  else cols = Math.ceil(Math.sqrt(total));
+
+  const rows = Math.ceil(total / cols);
+  list.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  list.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
   document.getElementById('serviceScreen').style.display = 'none';
   document.getElementById('operatorScreen').classList.add('active');

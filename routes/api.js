@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
 const { db } = require('../database/db');
 const queue = require('../services/queue');
 const { printTicket } = require('../services/printer');
@@ -49,7 +51,7 @@ router.get('/operators', (req, res) => {
 router.get('/operators/available', (req, res) => {
   // Operators who are logged in to an open (not paused, not closed) counter
   const available = db.prepare(`
-    SELECT o.id, o.name, c.id as counter_id, c.name as counter_name, c.number as counter_number
+    SELECT o.id, o.name, o.photo, c.id as counter_id, c.name as counter_name, c.number as counter_number
     FROM operators o
     JOIN counters c ON c.operator_id = o.id
     WHERE o.active = 1 AND c.status IN ('open', 'busy')
@@ -74,6 +76,27 @@ router.put('/operators/:id', (req, res) => {
 router.delete('/operators/:id', (req, res) => {
   db.prepare('UPDATE operators SET active = 0 WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+router.post('/operators/:id/photo', (req, res) => {
+  const { photo } = req.body; // base64 string: "data:image/jpeg;base64,..."
+  if (!photo) return res.status(400).json({ error: 'photo required' });
+
+  // Save as file
+  const match = photo.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!match) return res.status(400).json({ error: 'invalid image format' });
+
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const data = Buffer.from(match[2], 'base64');
+  const filename = `operator_${req.params.id}.${ext}`;
+  const filepath = path.join(__dirname, '..', 'public', 'img', 'operators', filename);
+
+  fs.writeFileSync(filepath, data);
+
+  const photoUrl = `/img/operators/${filename}`;
+  db.prepare('UPDATE operators SET photo = ? WHERE id = ?').run(photoUrl, req.params.id);
+
+  res.json({ ok: true, photo: photoUrl });
 });
 
 // ─── COUNTERS ────────────────────────────────────────────

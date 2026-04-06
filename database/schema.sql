@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS operators (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     pin TEXT,
+    photo TEXT,
     active INTEGER DEFAULT 1
 );
 

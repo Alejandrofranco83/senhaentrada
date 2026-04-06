@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Guía de Implementación - Sistema de Turnos Farmacia Franco</title>
+  <style>
+    @page { margin: 1.5cm 2cm; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #222;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2cm;
+    }
+    h1 { font-size: 22pt; color: #d42027; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #666; font-size: 12pt; margin-bottom: 30px; }
+    h2 { font-size: 14pt; color: #d42027; margin-top: 28px; margin-bottom: 10px; border-bottom: 2px solid #d42027; padding-bottom: 4px; page-break-after: avoid; }
+    h3 { font-size: 12pt; color: #333; margin-top: 16px; margin-bottom: 6px; }
+    p { margin-bottom: 8px; }
+    ul, ol { margin-left: 20px; margin-bottom: 10px; }
+    li { margin-bottom: 4px; }
+    code {
+      background: #f0f0f0;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 10pt;
+    }
+    pre {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 9.5pt;
+      margin: 8px 0 12px 0;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      page-break-inside: avoid;
+    }
+    pre .comment { color: #888; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    th { background: #d42027; color: white; }
+    tr:nth-child(even) { background: #f8f8f8; }
+    .box {
+      border: 1px solid #ddd;
+      border-left: 4px solid #d42027;
+      background: #fafafa;
+      padding: 10px 14px;
+      margin: 10px 0;
+      border-radius: 4px;
+      page-break-inside: avoid;
+    }
+    .box-success {
+      border-left-color: #4CAF50;
+      background: #f0f8f0;
+    }
+    .box-warning {
+      border-left-color: #FF9800;
+      background: #fff8f0;
+    }
+    .diagram {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      padding: 14px;
+      font-family: 'Consolas', monospace;
+      font-size: 9pt;
+      white-space: pre;
+      margin: 10px 0;
+      border-radius: 6px;
+      page-break-inside: avoid;
+    }
+    .page-break { page-break-before: always; }
+    .checklist { list-style-type: none; margin-left: 0; }
+    .checklist li::before { content: "☐ "; font-size: 14pt; }
+    .footer { margin-top: 40px; text-align: center; color: #999; font-size: 9pt; border-top: 1px solid #ddd; padding-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h1>Guía de Implementación</h1>
+<div class="subtitle">Sistema de Gestión de Turnos — Farmacia Franco<br>Sucursal Central</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>1. Requisitos Previos</h2>
+
+<h3>Hardware necesario</h3>
+<table>
+  <tr><th>Componente</th><th>Estado</th><th>Notas</th></tr>
+  <tr><td>PC Servidor (Windows)</td><td>Disponible</td><td>Cualquier PC del local. Debe estar encendida durante horario de atención.</td></tr>
+  <tr><td>1 Smart TV</td><td>Disponible</td><td>Conectada al WiFi del local</td></tr>
+  <tr><td>1 Tablet Android</td><td>Disponible</td><td>Se ubicará en la entrada</td></tr>
+  <tr><td>1 Impresora térmica 80mm con LAN</td><td>Disponible</td><td>Se ubicará en la entrada junto a la tablet</td></tr>
+  <tr><td>6 PCs en las cajas</td><td>Disponible</td><td>Solo necesitan navegador web</td></tr>
+  <tr><td>Soporte antirrobo para tablet</td><td><strong>Comprar</strong></td><td>~$20-30 USD, soporte de mesa o pared</td></tr>
+  <tr><td>Cable de red (impresora→router)</td><td><strong>Comprar</strong></td><td>Largo según distancia al router</td></tr>
+</table>
+
+<h3>Software necesario en el PC Servidor</h3>
+<table>
+  <tr><th>Software</th><th>Descarga</th></tr>
+  <tr><td>Node.js (versión LTS)</td><td>https://nodejs.org</td></tr>
+  <tr><td>Git</td><td>https://git-scm.com/download/win</td></tr>
+</table>
+
+<div class="box box-warning">
+  <strong>Importante:</strong> Instalar Node.js y Git ANTES de continuar. Reiniciar la terminal después de instalar.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>2. Diagrama de Conexiones</h2>
+
+<div class="diagram">
+                ┌── ENTRADA DEL LOCAL ──────────────┐
+                │  [Tablet en soporte]               │
+                │  [Impresora] ──cable de red──┐     │
+                └──────────────────────────────┤─────┘
+                                               │
+  [Smart TV] ──WiFi───────────────────────────┤
+                                               ├──► [Router WiFi/LAN]
+  [PC Caja 1] ──LAN──────────────────────────┤          │
+  [PC Caja 2] ──LAN──────────────────────────┤     [PC Servidor]
+  [PC Caja 3] ──LAN──────────────────────────┤     IP: 192.168.X.X
+  [PC Caja 4] ──LAN──────────────────────────┤
+  [PC Caja 5] ──LAN──────────────────────────┤
+  [PC Caja 6] ──LAN──────────────────────────┘
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 class="page-break">3. Instalación del Servidor</h2>
+
+<p>En el PC que será servidor, abrir una terminal (<code>cmd</code> o <code>PowerShell</code>) y ejecutar:</p>
+
+<pre><span class="comment"># Ir a Documentos (cambiar TU_USUARIO por el nombre real)</span>
+cd C:\Users\TU_USUARIO\Documents
+
+<span class="comment"># Descargar el proyecto desde GitHub</span>
+git clone https://github.com/Alejandrofranco83/senhaentrada.git
+
+<span class="comment"># Entrar a la carpeta</span>
+cd senhaentrada
+
+<span class="comment"># Instalar dependencias</span>
+npm install
+
+<span class="comment"># Iniciar el servidor (prueba)</span>
+npm start</pre>
+
+<div class="box box-success">
+  <strong>Verificación:</strong> Debe aparecer un cuadro con "Sistema de Turnos / Sistema de Senhas" y las URLs de las pantallas.
+</div>
+
+<h3>Obtener la IP del servidor</h3>
+<p>En la misma terminal, abrir otra ventana y ejecutar:</p>
+<pre>ipconfig</pre>
+<p>Buscar la línea <code>IPv4 Address: 192.168.X.X</code> — anotar esa dirección IP. Se usará en todos los pasos siguientes.</p>
+
+<div class="box">
+  <strong>Mi IP del servidor:</strong> ________________________________
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>4. Inicio Automático del Servidor</h2>
+
+<p>Para que el servidor arranque solo al encender la PC:</p>
+
+<ol>
+  <li>Crear un archivo de texto en el Escritorio y renombrarlo a <code>iniciar-turnos.bat</code></li>
+  <li>Abrir con bloc de notas y pegar (cambiar TU_USUARIO):
+    <pre>@echo off
+cd C:\Users\TU_USUARIO\Documents\senhaentrada
+node server.js</pre>
+  </li>
+  <li>Presionar <code>Win + R</code>, escribir <code>shell:startup</code> y presionar Enter</li>
+  <li>Copiar un acceso directo de <code>iniciar-turnos.bat</code> en esa carpeta</li>
+</ol>
+
+<div class="box box-success">
+  <strong>Verificación:</strong> Reiniciar la PC y verificar que el servidor arranca solo (aparece la ventana negra con el cuadro).
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>5. Configurar la Impresora</h2>
+
+<ol>
+  <li>Conectar la impresora al router con cable de red</li>
+  <li>Encender la impresora — generalmente imprime un ticket con su configuración de red</li>
+  <li>Anotar la IP de la impresora (ejemplo: <code>192.168.1.100</code>)</li>
+  <li>En el PC servidor, abrir el archivo <code>config\default.json</code> con bloc de notas</li>
+  <li>Cambiar la sección de impresora:
+    <pre>{
+  "printer": {
+    "enabled": true,
+    "type": "network",
+    "ip": "192.168.1.100",
+    "port": 9100
+  }
+}</pre>
+  </li>
+  <li>Guardar y reiniciar el servidor</li>
+</ol>
+
+<div class="box">
+  <strong>IP de mi impresora:</strong> ________________________________
+</div>
+
+<div class="box box-success">
+  <strong>Verificación:</strong> Crear un ticket desde el kiosko (paso 9) y verificar que se imprime.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 class="page-break">6. Configurar Operadores y Cajas (Panel Admin)</h2>
+
+<p>Desde cualquier PC del local, abrir el navegador e ir a:</p>
+<pre>http://192.168.X.X:3000/admin</pre>
+
+<h3>6a. Registrar operadores</h3>
+<ol>
+  <li>Ir a la pestaña <strong>"Operadores"</strong></li>
+  <li>Editar cada operador con su nombre real</li>
+  <li>Subir la foto de cada operador (botón <strong>"📷 Foto"</strong>)</li>
+  <li>Agregar o eliminar operadores según sea necesario</li>
+</ol>
+
+<h3>6b. Configurar servicios por caja</h3>
+<ol>
+  <li>Ir a la pestaña <strong>"Cajas / Caixas"</strong></li>
+  <li>Marcar/desmarcar los checkboxes de servicios para cada caja</li>
+</ol>
+
+<table>
+  <tr><th>Caja</th><th>Farmacia (F)</th><th>Telefonía (T)</th><th>Retirada (M)</th></tr>
+  <tr><td>Caja 1</td><td>☐</td><td>☐</td><td>☐</td></tr>
+  <tr><td>Caja 2</td><td>☐</td><td>☐</td><td>☐</td></tr>
+  <tr><td>Caja 3</td><td>☐</td><td>☐</td><td>☐</td></tr>
+  <tr><td>Caja 4</td><td>☐</td><td>☐</td><td>☐</td></tr>
+  <tr><td>Caja 5</td><td>☐</td><td>☐</td><td>☐</td></tr>
+  <tr><td>Caja 6</td><td>☐</td><td>☐</td><td>☐</td></tr>
+</table>
+<p><em>Llenar esta tabla antes de configurar. Ejemplo: Caja 4 solo Telefonía.</em></p>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>7. Configurar la Smart TV (Display)</h2>
+
+<ol>
+  <li>Encender la TV y conectarla al <strong>WiFi del local</strong></li>
+  <li>Abrir el <strong>navegador</strong> de la Smart TV</li>
+  <li>Ir a: <code>http://192.168.X.X:3000/display</code></li>
+  <li>Tocar <strong>"Activar Pantalla / Ativar Tela"</strong> (habilita el audio)</li>
+  <li>Poner en <strong>pantalla completa</strong></li>
+  <li>Subir el volumen de la TV al nivel deseado para los anuncios por voz</li>
+</ol>
+
+<div class="box box-warning">
+  <strong>Importante:</strong> Si la TV se apaga o el navegador se cierra, hay que repetir los pasos 2-5. Se recomienda desactivar el apagado automático de la TV.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>8. Configurar la Tablet (Kiosko)</h2>
+
+<ol>
+  <li>Conectar la tablet al <strong>WiFi del local</strong></li>
+  <li>Instalar <strong>"Fully Kiosk Browser"</strong> desde Play Store</li>
+  <li>Abrir Fully Kiosk y configurar:
+    <ul>
+      <li><strong>Start URL:</strong> <code>http://192.168.X.X:3000/kiosk</code></li>
+      <li><strong>Enable Kiosk Mode:</strong> Activar</li>
+      <li><strong>Kiosk Exit Password:</strong> Definir una contraseña (para poder salir del modo kiosko)</li>
+    </ul>
+  </li>
+  <li>Montar la tablet con el soporte en la entrada, junto a la impresora</li>
+  <li>Conectar el cargador de la tablet (va a estar encendida todo el día)</li>
+</ol>
+
+<div class="box">
+  <strong>Contraseña de Fully Kiosk:</strong> ________________________________
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2 class="page-break">9. Configurar las PCs de las Cajas (Operador)</h2>
+
+<p>En cada PC de caja:</p>
+
+<ol>
+  <li>Abrir Chrome o Edge</li>
+  <li>Ir a: <code>http://192.168.X.X:3000/operator</code></li>
+  <li><strong>Opcional — crear acceso directo en el Escritorio:</strong>
+    <ul>
+      <li>Click derecho en Escritorio → Nuevo → Acceso directo</li>
+      <li>Ubicación: <code>chrome "http://192.168.X.X:3000/operator"</code></li>
+      <li>Nombre: <strong>"Sistema de Turnos"</strong></li>
+    </ul>
+  </li>
+</ol>
+
+<div class="box box-success">
+  <strong>El operador solo necesita:</strong> Abrir el acceso directo, seleccionar su nombre, seleccionar su caja, y click "Abrir Caja". Si recarga la página, la sesión se mantiene.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>10. Prueba Completa</h2>
+
+<p>Seguir estos pasos en orden y marcar cada uno:</p>
+
+<ul class="checklist">
+  <li>Un operador abre su caja desde el panel operador</li>
+  <li>Tocar "Farmacia General" en la tablet del kiosko</li>
+  <li>Verificar que se imprime el ticket</li>
+  <li>El operador hace click en "Llamar Siguiente"</li>
+  <li>Verificar que la TV muestra el turno con borde parpadeante</li>
+  <li>Verificar que suena el anuncio de voz (español + portugués)</li>
+  <li>El operador hace click en "Completar"</li>
+  <li>Repetir con "Telefonía y Servicios"</li>
+  <li>Repetir con "Retirada de Mercadería"</li>
+  <li>Probar "Elegir Atendiente" → seleccionar un operador → verificar que solo ese operador recibe el ticket</li>
+  <li>Probar "Pausar" en una caja → verificar que no recibe tickets</li>
+  <li>Verificar estadísticas en Admin</li>
+</ul>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>11. Operación Diaria</h2>
+
+<table>
+  <tr><th>Quién</th><th>Cuándo</th><th>Qué hacer</th></tr>
+  <tr><td>PC Servidor</td><td>Al encender</td><td>Arranca solo (configurado en paso 4)</td></tr>
+  <tr><td>Operador</td><td>Al llegar</td><td>Abrir "Sistema de Turnos", seleccionar nombre y caja, click "Abrir Caja"</td></tr>
+  <tr><td>Operador</td><td>Necesita pausa</td><td>Click "Pausar" — no recibe tickets hasta reanudar</td></tr>
+  <tr><td>Operador</td><td>Al irse</td><td>Click "Cerrar Caja"</td></tr>
+  <tr><td>Admin/Encargado</td><td>Si algo falla</td><td>Abrir /admin → Cajas → "Forzar Cierre" en cajas bloqueadas</td></tr>
+  <tr><td>Numeración</td><td>Cada día</td><td>Se reinicia automáticamente (F001, T001, M001...)</td></tr>
+</table>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>12. URLs de Referencia Rápida</h2>
+
+<table>
+  <tr><th>Pantalla</th><th>URL</th><th>Dispositivo</th></tr>
+  <tr><td><strong>Kiosko</strong></td><td>http://192.168.X.X:3000/kiosk</td><td>Tablet (entrada)</td></tr>
+  <tr><td><strong>Display TV</strong></td><td>http://192.168.X.X:3000/display</td><td>Smart TV</td></tr>
+  <tr><td><strong>Operador</strong></td><td>http://192.168.X.X:3000/operator</td><td>PC de cada caja</td></tr>
+  <tr><td><strong>Admin</strong></td><td>http://192.168.X.X:3000/admin</td><td>Cualquier PC</td></tr>
+</table>
+
+<div class="box">
+  <strong>Reemplazar</strong> <code>192.168.X.X</code> por la IP real del servidor anotada en el paso 3.
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>13. Solución de Problemas</h2>
+
+<table>
+  <tr><th>Problema</th><th>Solución</th></tr>
+  <tr><td>No se puede acceder a las pantallas</td><td>Verificar que el servidor está corriendo. Verificar que todos los dispositivos están en la misma red WiFi/LAN.</td></tr>
+  <tr><td>No imprime el ticket</td><td>Verificar la IP de la impresora en config/default.json. Verificar que "enabled" es true. Verificar cable de red.</td></tr>
+  <tr><td>No suena el audio en la TV</td><td>Hay que tocar "Activar Pantalla" cada vez que se recarga la página. Verificar volumen de la TV.</td></tr>
+  <tr><td>Operador no puede entrar a una caja</td><td>Ir a Admin → Cajas → "Forzar Cierre" en la caja bloqueada.</td></tr>
+  <tr><td>El servidor no arranca</td><td>Verificar que Node.js está instalado. Abrir terminal en la carpeta senhaentrada y ejecutar: <code>npm start</code></td></tr>
+  <tr><td>Actualizar el sistema</td><td>En la carpeta senhaentrada ejecutar: <code>git pull</code> y reiniciar el servidor.</td></tr>
+</table>
+
+<div class="footer">
+  Farmacia Franco — Sistema de Gestión de Turnos v1.0<br>
+  Documento generado el 6 de abril de 2026
+</div>
+
+</body>
+</html>

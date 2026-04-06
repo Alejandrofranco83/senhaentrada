@@ -177,17 +177,62 @@ function addService() {
 async function loadOperators() {
   const operators = await fetch('/api/operators').then(r => r.json());
 
-  document.getElementById('operatorsTable').innerHTML = operators.map(o => `
+  document.getElementById('operatorsTable').innerHTML = operators.map(o => {
+    const photoHtml = o.photo
+      ? `<img src="${o.photo}?t=${Date.now()}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:white;">${o.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>`;
+    return `
     <tr>
       <td>${o.id}</td>
-      <td>${o.name}</td>
+      <td style="display:flex;align-items:center;gap:0.75rem;">${photoHtml} ${o.name}</td>
       <td>${o.active ? '✅ Activo' : '❌ Inactivo'}</td>
       <td>
-        <button class="btn btn-info" style="padding:4px 12px;font-size:0.8rem;" onclick="editOperator(${o.id}, '${o.name}')">Editar</button>
+        <label class="btn btn-purple" style="padding:4px 12px;font-size:0.8rem;cursor:pointer;">
+          📷 Foto
+          <input type="file" accept="image/*" style="display:none;" onchange="uploadPhoto(${o.id}, this)">
+        </label>
+        <button class="btn btn-info" style="padding:4px 12px;font-size:0.8rem;" onclick="editOperator(${o.id}, '${o.name.replace(/'/g, "\\'")}')">Editar</button>
         <button class="btn btn-danger" style="padding:4px 12px;font-size:0.8rem;" onclick="deleteOperator(${o.id})">Eliminar</button>
       </td>
     </tr>
-  `).join('');
+  `}).join('');
+}
+
+async function uploadPhoto(operatorId, input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Resize and convert to base64
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    // Create a canvas to resize
+    const img = new Image();
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      const size = 300; // 300x300 max
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Crop to square from center
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+
+      const base64 = canvas.toDataURL('image/jpeg', 0.85);
+
+      await fetch(`/api/operators/${operatorId}/photo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: base64 })
+      });
+
+      loadOperators();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function addOperator() {

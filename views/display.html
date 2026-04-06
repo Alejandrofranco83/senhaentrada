@@ -62,13 +62,13 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.8rem 1.5rem;
+      padding: 1rem 2rem;
       transition: all 0.3s;
     }
 
     .display-ticket.highlight {
-      animation: pulseHighlight 2s ease-in-out 3;
-      border: 2px solid var(--accent);
+      animation: pulseHighlight 1s ease-in-out 10;
+      border: 3px solid var(--accent);
     }
 
     .display-ticket .ticket-left {
@@ -77,22 +77,22 @@
     }
 
     .display-ticket .ticket-code {
-      font-size: 3rem;
+      font-size: 4.5rem;
       font-weight: 900;
-      letter-spacing: 2px;
+      letter-spacing: 3px;
       line-height: 1;
     }
 
     .display-ticket .ticket-service {
-      font-size: 0.8rem;
+      font-size: 1.1rem;
       color: var(--text-muted);
-      margin-top: 4px;
+      margin-top: 6px;
     }
 
     .display-ticket .arrow {
-      font-size: 1.8rem;
+      font-size: 3rem;
       color: var(--text-muted);
-      margin: 0 0.75rem;
+      margin: 0 1rem;
     }
 
     .display-ticket .ticket-counter {
@@ -100,12 +100,12 @@
     }
 
     .display-ticket .counter-label {
-      font-size: 0.75rem;
+      font-size: 1rem;
       color: var(--text-muted);
     }
 
     .display-ticket .counter-number {
-      font-size: 2.5rem;
+      font-size: 4.5rem;
       font-weight: 800;
       line-height: 1;
     }
@@ -154,8 +154,8 @@
     }
 
     @keyframes pulseHighlight {
-      0%, 100% { box-shadow: none; }
-      50% { box-shadow: 0 0 25px rgba(212, 32, 39, 0.5); }
+      0%, 100% { box-shadow: none; border-color: var(--accent); }
+      50% { box-shadow: 0 0 35px rgba(212, 32, 39, 0.6); border-color: #ff4444; }
     }
   </style>
 </head>

@@ -32,7 +32,7 @@ function renderCalled() {
   }
 
   container.innerHTML = calledTickets.map((t, i) => `
-    <div class="display-ticket ${i === 0 ? 'highlight' : ''}" style="animation: slideIn 0.3s ease ${i * 0.05}s both;">
+    <div class="display-ticket ${i === 0 ? 'highlight' : ''}">
       <div class="ticket-left">
         <div class="ticket-code" style="color:${t.color || 'var(--accent)'}">${t.code}</div>
         <div class="ticket-service">${t.service_name || ''} / ${t.service_name_pt || ''}</div>

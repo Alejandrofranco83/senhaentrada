@@ -21,6 +21,13 @@ db.pragma('foreign_keys = ON');
 const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
 db.exec(schema);
 
+// Migrations: add columns if missing
+try {
+  db.prepare("SELECT photo FROM operators LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE operators ADD COLUMN photo TEXT").run();
+}
+
 // Seed default data if empty
 function seedDefaults(config) {
   const branchCount = db.prepare('SELECT COUNT(*) as c FROM branch').get().c;
