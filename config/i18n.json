@@ -1,0 +1,50 @@
+{
+  "services": {
+    "farmacia": { "es": "Farmacia General", "pt": "Farmácia Geral" },
+    "telefonia": { "es": "Telefonía y Servicios", "pt": "Telefonia e Serviços" },
+    "retirada": { "es": "Retirada de Mercadería", "pt": "Retirada de Mercadoria" },
+    "atendiente": { "es": "Elegir Atendiente", "pt": "Escolher Atendente" }
+  },
+  "kiosk": {
+    "title": { "es": "Seleccione su servicio", "pt": "Selecione seu serviço" },
+    "ticketGenerated": { "es": "Su turno es", "pt": "Sua senha é" },
+    "pleaseWait": { "es": "Por favor espere su llamado", "pt": "Por favor aguarde sua chamada" },
+    "selectOperator": { "es": "Seleccione un atendiente", "pt": "Selecione um atendente" },
+    "firstAvailable": { "es": "Primero disponible", "pt": "Primeiro disponível" }
+  },
+  "display": {
+    "title": { "es": "Turnos", "pt": "Senhas" },
+    "goTo": { "es": "Diríjase a", "pt": "Dirija-se ao" },
+    "counter": { "es": "Caja", "pt": "Caixa" },
+    "waiting": { "es": "En espera", "pt": "Em espera" },
+    "paused": { "es": "En pausa", "pt": "Em pausa" },
+    "people": { "es": "personas", "pt": "pessoas" },
+    "noTickets": { "es": "Sin turnos en espera", "pt": "Sem senhas em espera" }
+  },
+  "operator": {
+    "selectCounter": { "es": "Seleccione su caja", "pt": "Selecione seu caixa" },
+    "selectOperator": { "es": "Seleccione su nombre", "pt": "Selecione seu nome" },
+    "openCounter": { "es": "Abrir Caja", "pt": "Abrir Caixa" },
+    "closeCounter": { "es": "Cerrar Caja", "pt": "Fechar Caixa" },
+    "callNext": { "es": "Llamar Siguiente", "pt": "Chamar Próximo" },
+    "recall": { "es": "Re-llamar", "pt": "Chamar Novamente" },
+    "complete": { "es": "Completar", "pt": "Concluir" },
+    "noShow": { "es": "No se presentó", "pt": "Não compareceu" },
+    "pause": { "es": "Pausar", "pt": "Pausar" },
+    "resume": { "es": "Reanudar", "pt": "Retomar" },
+    "waiting": { "es": "en espera", "pt": "em espera" },
+    "forYou": { "es": "te solicitan", "pt": "te solicitam" },
+    "currentTicket": { "es": "Atendiendo", "pt": "Atendendo" },
+    "noTicketsWaiting": { "es": "No hay turnos en espera", "pt": "Sem senhas em espera" }
+  },
+  "tts": {
+    "announcement": { "es": "Turno {code}, diríjase a Caja {counter}", "pt": "Senha {code}, dirija-se ao Caixa {counter}" }
+  },
+  "ticket": {
+    "header": { "es": "TURNO / SENHA", "pt": "" },
+    "service": { "es": "Servicio", "pt": "Serviço" },
+    "date": { "es": "Fecha", "pt": "Data" },
+    "waitingAhead": { "es": "Personas adelante", "pt": "Pessoas na frente" },
+    "thankYou": { "es": "Gracias por su espera", "pt": "Obrigado pela espera" }
+  }
+}

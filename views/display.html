@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Display - Farmacia Franco</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body { overflow: hidden; margin: 0; }
+
+    .display-page {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header: compact, one line */
+    .display-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 1.5rem;
+      background: var(--bg-card);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .display-topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .display-topbar img { height: 45px; }
+
+    .display-topbar h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+    }
+
+    .display-topbar h1 .pt {
+      font-size: 0.75em;
+      color: var(--text-muted);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    /* Main area: 2 columns of tickets */
+    .display-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      padding: 0.6rem;
+      min-height: 0;
+    }
+
+    /* Each ticket card */
+    .display-ticket {
+      background: var(--bg-card);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 1.5rem;
+      transition: all 0.3s;
+    }
+
+    .display-ticket.highlight {
+      animation: pulseHighlight 2s ease-in-out 3;
+      border: 2px solid var(--accent);
+    }
+
+    .display-ticket .ticket-left {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .display-ticket .ticket-code {
+      font-size: 3rem;
+      font-weight: 900;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+
+    .display-ticket .ticket-service {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .display-ticket .arrow {
+      font-size: 1.8rem;
+      color: var(--text-muted);
+      margin: 0 0.75rem;
+    }
+
+    .display-ticket .ticket-counter {
+      text-align: right;
+    }
+
+    .display-ticket .counter-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .display-ticket .counter-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    /* Empty state */
+    .display-empty {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.4;
+      font-size: 1.3rem;
+    }
+
+    /* Bottom: waiting stats */
+    .display-footer {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.6rem 1rem;
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .display-footer .stat {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.4rem;
+      border-radius: 8px;
+    }
+
+    .display-footer .stat .icon { font-size: 1.8rem; }
+
+    .display-footer .stat .count {
+      font-size: 2.2rem;
+      font-weight: 800;
+    }
+
+    .display-footer .stat .label {
+      font-size: 1rem;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+
+    @keyframes pulseHighlight {
+      0%, 100% { box-shadow: none; }
+      50% { box-shadow: 0 0 25px rgba(212, 32, 39, 0.5); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Audio activation overlay -->
+  <div id="audioOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="activateAudio()">
+    <img src="/img/logo.png" alt="Farmacia Franco" style="height:80px;margin-bottom:2rem;">
+    <div style="font-size:2.5rem;font-weight:700;">Activar Pantalla</div>
+    <div style="font-size:1.8rem;color:var(--text-muted);margin-top:0.5rem;">Ativar Tela</div>
+    <div style="margin-top:3rem;font-size:4rem;">🔊</div>
+    <div style="margin-top:1rem;font-size:1.2rem;color:var(--text-muted);">
+      Toque para activar el audio / Toque para ativar o áudio
+    </div>
+  </div>
+
+  <div class="display-page">
+    <!-- Top bar -->
+    <div class="display-topbar">
+      <div class="display-topbar-left">
+        <img src="/img/logo.png" alt="Farmacia Franco">
+        <h1>Turnos <span class="pt">/ Senhas</span></h1>
+      </div>
+    </div>
+
+    <!-- Tickets grid (2 columns) -->
+    <div class="display-body" id="calledList">
+      <div class="display-empty">Esperando turnos... / Aguardando senhas...</div>
+    </div>
+
+    <!-- Waiting stats footer -->
+    <div class="display-footer" id="waitingStats"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/display.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Sistema de Turnos</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <img src="/img/logo.png" alt="Farmacia Franco" style="height:40px;">
+      <div>
+        <h1>Panel de Administración</h1>
+        <span class="branch-name" id="branchName"></span>
+      </div>
+    </div>
+    <div class="flex gap-1">
+      <a href="/kiosk" target="_blank" class="btn btn-info" style="font-size:0.8rem;">Kiosko</a>
+      <a href="/display" target="_blank" class="btn btn-success" style="font-size:0.8rem;">Display</a>
+      <a href="/operator" target="_blank" class="btn btn-purple" style="font-size:0.8rem;">Operador</a>
+    </div>
+  </div>
+
+  <div class="admin-container">
+    <!-- Navigation -->
+    <div class="admin-nav">
+      <button class="tab active" onclick="showSection('stats')">Estadísticas</button>
+      <button class="tab" onclick="showSection('counters')">Cajas / Caixas</button>
+      <button class="tab" onclick="showSection('services')">Servicios</button>
+      <button class="tab" onclick="showSection('operators')">Operadores</button>
+      <button class="tab" onclick="showSection('queue')">Cola Actual</button>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="admin-section active" id="section-stats">
+      <div class="grid-2 mb-2" id="statCards"></div>
+      <div class="card mt-2">
+        <h3 class="mb-2">Por Servicio / Por Serviço</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Servicio</th>
+              <th>Atendidos</th>
+              <th>En Espera</th>
+              <th>No Show</th>
+              <th>Espera Prom.</th>
+            </tr>
+          </thead>
+          <tbody id="statsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Counters Section -->
+    <div class="admin-section" id="section-counters">
+      <div class="card">
+        <h3 class="mb-2">Cajas / Caixas</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nombre</th>
+              <th>Estado</th>
+              <th>Operador</th>
+              <th>Ticket Actual</th>
+              <th>Servicios</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="countersTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Services Section -->
+    <div class="admin-section" id="section-services">
+      <div class="card">
+        <div class="flex justify-between items-center mb-2">
+          <h3>Servicios / Serviços</h3>
+          <button class="btn btn-success" onclick="addService()" style="font-size:0.85rem;">+ Agregar</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Prefijo</th>
+              <th>Nombre (ES)</th>
+              <th>Nombre (PT)</th>
+              <th>Prioridad</th>
+              <th>Color</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="servicesTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Operators Section -->
+    <div class="admin-section" id="section-operators">
+      <div class="card">
+        <div class="flex justify-between items-center mb-2">
+          <h3>Operadores / Operadores</h3>
+          <button class="btn btn-success" onclick="addOperator()" style="font-size:0.85rem;">+ Agregar</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="operatorsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Queue Section -->
+    <div class="admin-section" id="section-queue">
+      <div class="card">
+        <h3 class="mb-2">Cola Actual / Fila Atual</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Servicio</th>
+              <th>Estado</th>
+              <th>Caja</th>
+              <th>Hora</th>
+            </tr>
+          </thead>
+          <tbody id="queueTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

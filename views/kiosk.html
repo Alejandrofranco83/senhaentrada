@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Kiosko - Farmacia Franco</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+      margin: 0;
+    }
+
+    /* ── FULL SCREEN KIOSK ── */
+    .kiosk-container {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+
+    .kiosk-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 0.8rem;
+      background: var(--bg-card);
+    }
+
+    .kiosk-header img {
+      height: 45px;
+    }
+
+    .kiosk-header .titles {
+      font-size: 1.1rem;
+      line-height: 1.3;
+    }
+
+    .kiosk-header .titles .pt {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Buttons fill ALL remaining space */
+    .kiosk-services {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 6px;
+      padding: 6px;
+      max-width: none;
+      width: 100%;
+    }
+
+    .kiosk-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.15s, filter 0.15s;
+      color: white;
+      padding: 1rem;
+      min-height: 0; /* let grid control height */
+    }
+
+    .kiosk-btn:active {
+      transform: scale(0.96);
+      filter: brightness(0.85);
+    }
+
+    .kiosk-btn .icon {
+      font-size: 3.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .kiosk-btn .label-es {
+      font-size: 1.6rem;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .kiosk-btn .label-pt {
+      font-size: 1.1rem;
+      color: rgba(255,255,255,0.75);
+      font-style: italic;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    /* ── TICKET RESULT (full screen) ── */
+    .kiosk-ticket-result {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      background: var(--bg);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .kiosk-ticket-result.active { display: flex; }
+
+    .ticket-code-display {
+      font-size: 8rem;
+      font-weight: 900;
+      color: var(--accent);
+      margin: 0.5rem 0;
+      letter-spacing: 6px;
+      text-shadow: 0 0 50px rgba(212, 32, 39, 0.4);
+    }
+
+    /* ── OPERATOR SELECTION (full screen) ── */
+    .kiosk-operators {
+      display: none;
+      flex-direction: column;
+      height: 100vh;
+      padding: 0;
+    }
+
+    .kiosk-operators.active { display: flex; }
+
+    .kiosk-operators .kiosk-header {
+      flex-shrink: 0;
+    }
+
+    .operator-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px;
+      overflow-y: auto;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+    }
+
+    .operator-btn {
+      padding: 1.3rem 1.5rem;
+      border: 2px solid var(--purple);
+      background: var(--bg-card);
+      color: var(--text);
+      border-radius: 12px;
+      font-size: 1.4rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .operator-btn:active {
+      background: var(--purple);
+      color: white;
+    }
+
+    .operator-btn.first-available {
+      border-color: var(--success);
+      background: rgba(76, 175, 80, 0.15);
+    }
+
+    .operator-btn.first-available:active {
+      background: var(--success);
+    }
+
+    .back-btn {
+      padding: 1rem;
+      background: var(--bg-surface);
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (orientation: portrait) {
+      .kiosk-services {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(4, 1fr);
+      }
+      .kiosk-btn .icon { font-size: 2.8rem; }
+      .kiosk-btn .label-es { font-size: 1.4rem; }
+      .kiosk-btn .label-pt { font-size: 1rem; }
+      .ticket-code-display { font-size: 6rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Main Service Selection -->
+  <div class="kiosk-container" id="serviceScreen">
+    <div class="kiosk-header">
+      <img src="/img/logo.png" alt="Farmacia Franco">
+      <div class="titles">
+        <div>Seleccione su servicio</div>
+        <div class="pt">Selecione seu serviço</div>
+      </div>
+    </div>
+    <div class="kiosk-services" id="serviceButtons"></div>
+  </div>
+
+  <!-- Operator Selection -->
+  <div class="kiosk-operators" id="operatorScreen">
+    <div class="kiosk-header">
+      <img src="/img/logo.png" alt="Farmacia Franco">
+      <div class="titles">
+        <div>Seleccione un atendiente</div>
+        <div class="pt">Selecione um atendente</div>
+      </div>
+    </div>
+    <div class="operator-list" id="operatorList"></div>
+    <button class="back-btn" onclick="showServiceScreen()">
+      ← Volver / Voltar
+    </button>
+  </div>
+
+  <!-- Ticket Generated -->
+  <div class="kiosk-ticket-result" id="ticketScreen">
+    <img src="/img/logo.png" alt="Farmacia Franco" style="height:50px;margin-bottom:0.5rem;">
+    <div style="font-size:1.5rem;">Su turno es / Sua senha é</div>
+    <div class="ticket-code-display" id="ticketCode"></div>
+    <div style="font-size:1.3rem;" id="ticketServiceEs"></div>
+    <div style="font-size:1rem;color:var(--text-muted);font-style:italic;" id="ticketServicePt"></div>
+    <div style="font-size:1.2rem;margin-top:1.5rem;color:var(--text-muted);">
+      Por favor espere su llamado<br>
+      <i>Por favor aguarde sua chamada</i>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/kiosk.js"></script>
+</body>
+</html>

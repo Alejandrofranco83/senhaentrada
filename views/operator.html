@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Operador - Farmacia Franco</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .op-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top bar */
+    .op-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 1.5rem;
+      background: var(--bg-card);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .op-topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .op-topbar img { height: 32px; }
+    .op-counter-name { font-size: 1.1rem; font-weight: 700; }
+    .op-operator-name { color: var(--text-muted); font-size: 0.9rem; }
+
+    /* Main area fills remaining height */
+    .op-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem 1.5rem;
+      gap: 1rem;
+    }
+
+    /* Top row: info + ticket */
+    .op-info-row {
+      display: flex;
+      gap: 1rem;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Queue badges (vertical, left side) */
+    .op-queue-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 140px;
+      flex-shrink: 0;
+    }
+
+    .op-queue-badge {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .op-queue-badge .number {
+      font-size: 2.5rem;
+      font-weight: 800;
+    }
+
+    .op-queue-badge .label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Ticket display (center, fills space) */
+    .op-ticket {
+      flex: 1;
+      background: var(--bg-card);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.5rem;
+    }
+
+    .op-ticket .label {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .op-ticket .code {
+      font-size: 5.5rem;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: 3px;
+      line-height: 1.1;
+    }
+
+    .op-ticket .service-name {
+      font-size: 1.05rem;
+      margin-top: 0.25rem;
+    }
+
+    .op-ticket.empty .code {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      letter-spacing: 0;
+    }
+
+    /* Bottom row: buttons */
+    .op-buttons-row {
+      display: flex;
+      gap: 1rem;
+      flex-shrink: 0;
+      height: 130px;
+    }
+
+    .op-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      color: white;
+      font-weight: 700;
+      transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+      text-align: center;
+      gap: 4px;
+    }
+
+    .op-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .op-btn:active:not(:disabled) {
+      transform: translateY(0);
+      filter: brightness(0.85);
+    }
+
+    .op-btn:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .op-btn .sub {
+      font-size: 0.75em;
+      opacity: 0.7;
+      font-weight: 400;
+    }
+
+    /* Big square buttons (LLAMAR and COMPLETAR) */
+    .op-btn.primary {
+      flex: 2;
+      font-size: 1.4rem;
+    }
+
+    /* Medium square buttons */
+    .op-btn.secondary {
+      flex: 1;
+      font-size: 1rem;
+    }
+
+    /* ── LOGIN ── */
+    .op-login {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    .op-login img { height: 70px; }
+
+    .op-login .select-group {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .op-login .select-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    .op-login .select-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      border: 2px solid var(--bg-surface);
+      background: var(--bg-card);
+      color: var(--text);
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="op-login" id="loginScreen">
+    <img src="/img/logo.png" alt="Farmacia Franco">
+    <h2 style="text-align:center;">
+      Iniciar Turno<br>
+      <small style="color:var(--text-muted);">Iniciar Turno</small>
+    </h2>
+
+    <div class="select-group">
+      <label>Operador / Operador</label>
+      <select id="operatorSelect">
+        <option value="">-- Seleccione / Selecione --</option>
+      </select>
+    </div>
+
+    <div class="select-group">
+      <label>Caja / Caixa</label>
+      <select id="counterSelect">
+        <option value="">-- Seleccione / Selecione --</option>
+      </select>
+    </div>
+
+    <button class="btn btn-success btn-lg" onclick="openCounter()">
+      Abrir Caja / Abrir Caixa
+    </button>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="op-page" id="dashboard" style="display:none;">
+    <!-- Top Bar -->
+    <div class="op-topbar">
+      <div class="op-topbar-left">
+        <img src="/img/logo.png" alt="Farmacia Franco">
+        <span class="op-counter-name" id="counterName">Caja 1</span>
+        <span class="op-operator-name" id="operatorName"></span>
+      </div>
+      <span class="status-indicator" id="statusIndicator">
+        <span class="status-dot"></span>
+        <span id="statusText">Abierta</span>
+      </span>
+    </div>
+
+    <div class="op-body">
+      <!-- Top: Queue info + Ticket -->
+      <div class="op-info-row">
+        <div class="op-queue-badges">
+          <div class="op-queue-badge">
+            <div class="number" id="waitingCount">0</div>
+            <div class="label">En espera<br><i>Em espera</i></div>
+          </div>
+          <div class="op-queue-badge">
+            <div class="number" style="color:var(--purple);" id="forYouCount">0</div>
+            <div class="label">Te solicitan<br><i>Te solicitam</i></div>
+          </div>
+        </div>
+
+        <div class="op-ticket empty" id="currentTicketCard">
+          <div class="label">Atendiendo / Atendendo</div>
+          <div class="code" id="currentTicketCode">
+            Sin turno activo<br><small style="font-size:0.7em;">Sem senha ativa</small>
+          </div>
+          <div class="service-name" id="currentTicketService"></div>
+        </div>
+      </div>
+
+      <!-- Bottom: Action Buttons -->
+      <div class="op-buttons-row">
+        <!-- LLAMAR (big, left) -->
+        <button class="op-btn primary" id="btnCallNext" onclick="callNext()"
+                style="background:var(--success);">
+          Llamar<br>Siguiente
+          <span class="sub">Chamar Próximo</span>
+        </button>
+
+        <!-- Re-llamar -->
+        <button class="op-btn secondary" id="btnRecall" onclick="recall()" disabled
+                style="background:var(--info);">
+          Re-llamar
+          <span class="sub">Chamar<br>Novamente</span>
+        </button>
+
+        <!-- No se presentó -->
+        <button class="op-btn secondary" id="btnNoShow" onclick="confirmNoShow()" disabled
+                style="background:#555;">
+          No se<br>presentó
+          <span class="sub">Não compareceu</span>
+        </button>
+
+        <!-- Pausar / Reanudar -->
+        <button class="op-btn secondary" id="btnPause" onclick="pauseCounter()"
+                style="background:var(--warning);">
+          ⏸<br>Pausar
+        </button>
+        <button class="op-btn secondary" id="btnResume" onclick="resumeCounter()"
+                style="display:none;background:var(--success);">
+          ▶<br>Reanudar
+          <span class="sub">Retomar</span>
+        </button>
+
+        <!-- Cerrar Caja -->
+        <button class="op-btn secondary" onclick="confirmClose()"
+                style="background:var(--accent);">
+          Cerrar<br>Caja
+          <span class="sub">Fechar Caixa</span>
+        </button>
+
+        <!-- COMPLETAR (big, right) -->
+        <button class="op-btn primary" id="btnComplete" onclick="complete()" disabled
+                style="background:#2e7d32;">
+          Completar
+          <span class="sub">Concluir</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/operator.js"></script>
+</body>
+</html>

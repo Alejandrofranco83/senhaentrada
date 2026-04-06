@@ -1,0 +1,20 @@
+{
+  "port": 3000,
+  "branch": {
+    "name": "Farmacia Franco - Central",
+    "code": "central"
+  },
+  "printer": {
+    "enabled": false,
+    "type": "network",
+    "ip": "192.168.1.100",
+    "port": 9100
+  },
+  "display": {
+    "lastCalledCount": 5,
+    "refreshInterval": 30000
+  },
+  "kiosk": {
+    "resetTimeout": 5000
+  }
+}
