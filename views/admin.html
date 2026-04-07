@@ -89,6 +89,7 @@
               <th>Prioridad</th>
               <th>Color</th>
               <th>Estado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="servicesTable"></tbody>
@@ -133,6 +134,68 @@
           </thead>
           <tbody id="queueTable"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Servicio (Agregar / Editar) -->
+  <div class="modal-overlay" id="serviceModal">
+    <div class="modal">
+      <h3 id="serviceModalTitle">Agregar Servicio</h3>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre (ES)</label>
+          <input type="text" id="svcName" placeholder="Ej: Farmacia">
+        </div>
+        <div class="form-group">
+          <label>Nombre (PT)</label>
+          <input type="text" id="svcNamePt" placeholder="Ex: Farmácia">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Prefijo (1 letra)</label>
+          <input type="text" id="svcPrefix" maxlength="1" placeholder="F">
+        </div>
+        <div class="form-group">
+          <label>Prioridad</label>
+          <select id="svcPriority">
+            <option value="1">Normal</option>
+            <option value="2">Alta</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Icono</label>
+        <div class="icon-picker" id="svcIconPicker"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Color</label>
+        <div class="color-picker" id="svcColorPicker">
+          <input type="color" id="svcColorCustom" value="#2196F3">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-toggle">
+          <div class="toggle-info">
+            <span class="toggle-title">Mostrar en kiosko</span>
+            <span class="toggle-hint">Si está apagado, no aparece como opción para los clientes</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="svcActive" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeServiceModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="saveService()">Guardar</button>
       </div>
     </div>
   </div>

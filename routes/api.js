@@ -14,9 +14,10 @@ router.setSocketEmitter = function (emitter) {
 
 // ─── SERVICES ────────────────────────────────────────────
 router.get('/services', (req, res) => {
-  const services = db.prepare(
-    'SELECT * FROM services WHERE active = 1 ORDER BY sort_order'
-  ).all();
+  const sql = req.query.all === 'true'
+    ? 'SELECT * FROM services ORDER BY sort_order'
+    : 'SELECT * FROM services WHERE active = 1 ORDER BY sort_order';
+  const services = db.prepare(sql).all();
   res.json(services);
 });
 

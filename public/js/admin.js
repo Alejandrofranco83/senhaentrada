@@ -138,40 +138,180 @@ async function toggleCounterService(counterId, serviceId, enabled) {
 }
 
 // ─── SERVICES ────────────────────────────────────────
-async function loadServices() {
-  const services = await fetch('/api/services').then(r => r.json());
+let servicesCache = [];
+let editingServiceId = null;
 
-  document.getElementById('servicesTable').innerHTML = services.map(s => `
-    <tr>
+const ICON_OPTIONS = [
+  '🏥', '💊', '💉', '🩺', '🩹', '🌡️', '⚕️', '🔬',
+  '🧪', '🧴', '👤', '👨‍⚕️', '👩‍⚕️', '📱', '📞', '📦',
+  '🛒', '🛍️', '💳', '💰', '🧾', '📋', '📝', '🆘',
+  '⭐', '❤️', '✨', '🎯', '🔔', '📢', '🏷️', '🎁'
+];
+
+const COLOR_OPTIONS = [
+  '#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#d42027',
+  '#00BCD4', '#FFC107', '#E91E63', '#3F51B5', '#009688',
+  '#795548', '#607D8B', '#673AB7', '#8BC34A', '#FF5722'
+];
+
+async function loadServices() {
+  const services = await fetch('/api/services?all=true').then(r => r.json());
+  servicesCache = services;
+
+  document.getElementById('servicesTable').innerHTML = services.map(s => {
+    const toggleLabel = s.active ? 'Desactivar' : 'Activar';
+    const toggleClass = s.active ? 'btn-warning' : 'btn-success';
+    return `
+    <tr style="${s.active ? '' : 'opacity:0.55;'}">
       <td><span style="background:${s.color};padding:2px 8px;border-radius:4px;">${s.prefix}</span></td>
-      <td>${s.icon} ${s.name}</td>
+      <td>${s.icon || ''} ${s.name}</td>
       <td>${s.name_pt || '-'}</td>
       <td>${s.priority}</td>
       <td><span style="background:${s.color};display:inline-block;width:20px;height:20px;border-radius:4px;"></span> ${s.color}</td>
       <td>${s.active ? '✅ Activo' : '❌ Inactivo'}</td>
+      <td>
+        <button class="btn btn-info" style="padding:4px 12px;font-size:0.8rem;" onclick="openServiceModal(${s.id})">Editar</button>
+        <button class="btn ${toggleClass}" style="padding:4px 12px;font-size:0.8rem;" onclick="toggleServiceActive(${s.id})">${toggleLabel}</button>
+      </td>
     </tr>
-  `).join('');
+  `;}).join('');
+}
+
+function buildIconPicker(selected) {
+  const picker = document.getElementById('svcIconPicker');
+  picker.innerHTML = ICON_OPTIONS.map(icon =>
+    `<div class="icon-option ${icon === selected ? 'selected' : ''}" data-icon="${icon}">${icon}</div>`
+  ).join('');
+
+  picker.querySelectorAll('.icon-option').forEach(el => {
+    el.onclick = () => {
+      picker.querySelectorAll('.icon-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+  });
+}
+
+function buildColorPicker(selected) {
+  const picker = document.getElementById('svcColorPicker');
+  const custom = document.getElementById('svcColorCustom');
+
+  // Remove existing swatches (keep the custom input)
+  picker.querySelectorAll('.color-swatch').forEach(el => el.remove());
+
+  COLOR_OPTIONS.forEach(color => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.background = color;
+    swatch.dataset.color = color;
+    if (color.toLowerCase() === (selected || '').toLowerCase()) swatch.classList.add('selected');
+    swatch.onclick = () => {
+      picker.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      custom.value = color;
+    };
+    picker.insertBefore(swatch, custom);
+  });
+
+  custom.value = selected || '#2196F3';
+  custom.oninput = () => {
+    picker.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  };
+}
+
+function openServiceModal(id) {
+  editingServiceId = id || null;
+  const s = id ? servicesCache.find(x => x.id === id) : null;
+
+  document.getElementById('serviceModalTitle').textContent = s ? 'Editar Servicio' : 'Agregar Servicio';
+  document.getElementById('svcName').value = s?.name || '';
+  document.getElementById('svcNamePt').value = s?.name_pt || '';
+  document.getElementById('svcPrefix').value = s?.prefix || '';
+  document.getElementById('svcPriority').value = s?.priority || 1;
+  document.getElementById('svcActive').checked = s ? !!s.active : true;
+
+  buildIconPicker(s?.icon || '');
+  buildColorPicker(s?.color || '#2196F3');
+
+  document.getElementById('serviceModal').classList.add('active');
+}
+
+function closeServiceModal() {
+  document.getElementById('serviceModal').classList.remove('active');
+  editingServiceId = null;
 }
 
 function addService() {
-  const name = prompt('Nombre (ES):');
-  if (!name) return;
-  const name_pt = prompt('Nombre (PT):');
-  const prefix = prompt('Prefijo (1 letra):');
-  if (!prefix) return;
-  const color = prompt('Color (hex):', '#2196F3');
-  const priority = prompt('Prioridad (1=normal, 2=alta):', '1');
+  openServiceModal(null);
+}
 
-  fetch('/api/services', {
-    method: 'POST',
+async function saveService() {
+  const name = document.getElementById('svcName').value.trim();
+  const name_pt = document.getElementById('svcNamePt').value.trim();
+  const prefix = document.getElementById('svcPrefix').value.trim().toUpperCase();
+  const priority = parseInt(document.getElementById('svcPriority').value);
+  const active = document.getElementById('svcActive').checked ? 1 : 0;
+  const color = document.getElementById('svcColorCustom').value;
+  const selectedIconEl = document.querySelector('#svcIconPicker .icon-option.selected');
+  const icon = selectedIconEl ? selectedIconEl.dataset.icon : '';
+
+  if (!name) { alert('El nombre (ES) es obligatorio'); return; }
+  if (!prefix) { alert('El prefijo es obligatorio'); return; }
+
+  const existing = editingServiceId ? servicesCache.find(x => x.id === editingServiceId) : null;
+  const payload = {
+    name,
+    name_pt,
+    prefix,
+    icon,
+    color,
+    priority,
+    is_specific: existing ? existing.is_specific : 0,
+    sort_order: existing ? existing.sort_order : 10,
+    active
+  };
+
+  const url = editingServiceId ? `/api/services/${editingServiceId}` : '/api/services';
+  const method = editingServiceId ? 'PUT' : 'POST';
+
+  await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  closeServiceModal();
+  loadServices();
+}
+
+function toggleServiceActive(id) {
+  const s = servicesCache.find(x => x.id === id);
+  if (!s) return;
+
+  const newActive = s.active ? 0 : 1;
+  const action = newActive ? 'activar' : 'desactivar';
+  if (!confirm(`¿Seguro que querés ${action} el servicio "${s.name}"?`)) return;
+
+  fetch(`/api/services/${id}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name, name_pt, prefix: prefix.toUpperCase(),
-      icon: '', color, priority: parseInt(priority),
-      is_specific: 0, sort_order: 10, active: 1
+      name: s.name,
+      name_pt: s.name_pt,
+      prefix: s.prefix,
+      icon: s.icon || '',
+      color: s.color,
+      priority: s.priority,
+      is_specific: s.is_specific,
+      sort_order: s.sort_order,
+      active: newActive
     })
   }).then(() => loadServices());
 }
+
+// Cerrar modal al hacer click fuera
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'serviceModal') closeServiceModal();
+});
 
 // ─── OPERATORS ───────────────────────────────────────
 async function loadOperators() {
