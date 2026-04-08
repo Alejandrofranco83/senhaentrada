@@ -71,7 +71,7 @@ async function printTicket(ticket) {
           .align('ct')
           .text('Gracias por su espera')
           .text('Obrigado pela espera')
-          .text('')
+          .feed(5)
           .cut()
           .close(() => resolve(true));
       });
