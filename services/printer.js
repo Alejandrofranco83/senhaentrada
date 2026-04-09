@@ -6,7 +6,7 @@ const i18n = require('../config/i18n.json');
  * Falls back to console simulation if printer is disabled or unavailable.
  */
 async function printTicket(ticket) {
-  const { code, service, waitingAhead } = ticket;
+  const { code, service, requestedOperator } = ticket;
   const now = new Date();
   const dateStr = now.toLocaleDateString('es-ES', {
     day: '2-digit', month: '2-digit', year: 'numeric'
@@ -18,15 +18,14 @@ async function printTicket(ticket) {
   if (!config.printer.enabled) {
     // Simulation mode
     console.log('\n╔══════════════════════════════╗');
-    console.log('║    TURNO / SENHA             ║');
-    console.log('║                              ║');
+    console.log(`║  ${config.branch.name}`.padEnd(31) + '║');
     console.log(`║    >>> ${code} <<<`.padEnd(31) + '║');
-    console.log('║                              ║');
     console.log(`║  ${service.name}`.padEnd(31) + '║');
     console.log(`║  ${service.name_pt || ''}`.padEnd(31) + '║');
+    if (requestedOperator) {
+      console.log(`║  Atendiente: ${requestedOperator.name}`.padEnd(31) + '║');
+    }
     console.log(`║  ${dateStr} ${timeStr}`.padEnd(31) + '║');
-    console.log(`║  Espera/Espera: ${waitingAhead} personas`.padEnd(31) + '║');
-    console.log('║                              ║');
     console.log('║  Gracias por su espera       ║');
     console.log('║  Obrigado pela espera        ║');
     console.log('╚══════════════════════════════╝\n');
@@ -52,23 +51,24 @@ async function printTicket(ticket) {
         printer
           .align('ct')
           .style('b')
-          .size(1, 1)
+          .size(0, 0)
           .text(config.branch.name)
-          .text('')
-          .text('TURNO / SENHA')
-          .text('')
-          .size(2, 2)
+          .size(3, 3)
           .text(code)
           .size(1, 1)
-          .text('')
-          .text(`${service.name}`)
-          .text(`${service.name_pt || ''}`)
-          .text('')
-          .align('lt')
-          .text(`Fecha/Data: ${dateStr} ${timeStr}`)
-          .text(`Espera: ${waitingAhead} personas/pessoas`)
-          .text('')
-          .align('ct')
+          .text(service.name)
+          .text(service.name_pt || '');
+
+        if (requestedOperator) {
+          printer
+            .size(1, 1)
+            .text(`Atendiente: ${requestedOperator.name}`);
+        }
+
+        printer
+          .size(0, 0)
+          .style('normal')
+          .text(`${dateStr} ${timeStr}`)
           .text('Gracias por su espera')
           .text('Obrigado pela espera')
           .feed(5)

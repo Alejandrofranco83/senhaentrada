@@ -47,7 +47,13 @@ function createTicket(serviceId, requestedOperatorId = null) {
     WHERE status = 'waiting' AND id < ?
   `).get(ticket.id).c;
 
-  return { ...ticket, waitingAhead, service };
+  // If operator was requested, fetch their name for the printed ticket
+  let requestedOperator = null;
+  if (requestedOperatorId) {
+    requestedOperator = db.prepare('SELECT name FROM operators WHERE id = ?').get(requestedOperatorId);
+  }
+
+  return { ...ticket, waitingAhead, service, requestedOperator };
 }
 
 /**

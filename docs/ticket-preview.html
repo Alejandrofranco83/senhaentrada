@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview Ticket - Impresora Térmica 80mm</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #2a2a2a;
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #eee;
+    }
+    h1 {
+      text-align: center;
+      color: #d42027;
+      margin-bottom: 8px;
+      font-size: 22pt;
+    }
+    .subtitle {
+      text-align: center;
+      color: #999;
+      margin-bottom: 30px;
+      font-size: 11pt;
+    }
+    .layout {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .ticket-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .ticket-label {
+      color: #aaa;
+      font-size: 10pt;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /*
+     * TICKET: simula papel térmico 80mm
+     * Ancho real de impresión ≈ 72mm = 272px a 96dpi
+     * Fuente monoespaciada para imitar ESC/POS
+     * 42 caracteres por línea en Font A (según hoja de config de la P3L)
+     */
+    .ticket {
+      background: #fdfdfd;
+      color: #111;
+      width: 300px;
+      padding: 8px 10px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.25;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      border-radius: 2px;
+      position: relative;
+    }
+    /* Borde superior dentado (simula papel arrancado) */
+    .ticket::before {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: 0;
+      right: 0;
+      height: 10px;
+      background:
+        linear-gradient(-45deg, transparent 33.333%, #fdfdfd 33.333%, #fdfdfd 66.667%, transparent 66.667%),
+        linear-gradient(45deg, transparent 33.333%, #fdfdfd 33.333%, #fdfdfd 66.667%, transparent 66.667%);
+      background-size: 14px 20px;
+      background-position: 0 0;
+    }
+    /* Borde inferior dentado */
+    .ticket::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 0;
+      right: 0;
+      height: 10px;
+      background:
+        linear-gradient(-45deg, #fdfdfd 33.333%, transparent 33.333%, transparent 66.667%, #fdfdfd 66.667%),
+        linear-gradient(45deg, #fdfdfd 33.333%, transparent 33.333%, transparent 66.667%, #fdfdfd 66.667%);
+      background-size: 14px 20px;
+      background-position: 0 0;
+    }
+
+    .ct { text-align: center; }
+    .lt { text-align: left; }
+    .rt { text-align: right; }
+    .b { font-weight: bold; }
+    /* Font A estándar 42 char/línea */
+    .sm {
+      font-size: 11px;
+      line-height: 1.15;
+    }
+    .big {
+      font-size: 36px;
+      font-weight: bold;
+      line-height: 1.0;
+      letter-spacing: 3px;
+    }
+    .line {
+      border-top: 1px dashed #888;
+      margin: 6px 0;
+    }
+    .blank {
+      height: 6px;
+    }
+    .blank-sm {
+      height: 3px;
+    }
+
+    /* Panel lateral con info */
+    .info {
+      max-width: 420px;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .info h2 {
+      color: #d42027;
+      font-size: 14pt;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #444;
+      padding-bottom: 6px;
+    }
+    .info p {
+      font-size: 10pt;
+      color: #ccc;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .info code {
+      background: #333;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: 'Consolas', monospace;
+      color: #4ec9b0;
+      font-size: 9.5pt;
+    }
+    .info ul {
+      margin-left: 18px;
+      font-size: 10pt;
+      color: #ccc;
+      line-height: 1.7;
+    }
+    .info .legend {
+      font-size: 9pt;
+      color: #888;
+      font-style: italic;
+      margin-top: 10px;
+    }
+    .info .section {
+      margin-bottom: 18px;
+    }
+    .tag {
+      display: inline-block;
+      background: #d42027;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 9pt;
+      font-weight: bold;
+      margin-right: 4px;
+    }
+    .tag.bw { background: #555; }
+
+    .tickets-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Preview del Ticket Impreso</h1>
+<div class="subtitle">
+  Simulación visual del ticket que imprime el sistema en la impresora Custom P3L (papel 80mm)<br>
+  Basado en <code style="background:#333;padding:1px 6px;border-radius:3px;color:#4ec9b0;">services/printer.js</code>
+</div>
+
+<div class="layout">
+
+  <!-- COLUMNA IZQUIERDA: los tres tickets (uno por servicio) -->
+  <div class="tickets-row">
+
+    <!-- ────────── TICKET FARMACIA ────────── -->
+    <div class="ticket-wrap">
+      <div class="ticket-label">Servicio: Farmacia</div>
+      <div class="ticket">
+        <div class="ct b sm">Farmacia Franco - Central</div>
+        <div class="blank-sm"></div>
+        <div class="ct big">F001</div>
+        <div class="blank-sm"></div>
+        <div class="ct b">Farmacia General</div>
+        <div class="ct b">Farmácia Geral</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">08/04/2026 16:25</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">Gracias por su espera</div>
+        <div class="ct sm">Obrigado pela espera</div>
+      </div>
+    </div>
+
+    <!-- ────────── TICKET TELEFONÍA ────────── -->
+    <div class="ticket-wrap">
+      <div class="ticket-label">Servicio: Telefonía</div>
+      <div class="ticket">
+        <div class="ct b sm">Farmacia Franco - Central</div>
+        <div class="blank-sm"></div>
+        <div class="ct big">T007</div>
+        <div class="blank-sm"></div>
+        <div class="ct b">Telefonía y Servicios</div>
+        <div class="ct b">Telefonia e Serviços</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">08/04/2026 16:28</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">Gracias por su espera</div>
+        <div class="ct sm">Obrigado pela espera</div>
+      </div>
+    </div>
+
+    <!-- ────────── TICKET RETIRADA ────────── -->
+    <div class="ticket-wrap">
+      <div class="ticket-label">Servicio: Retirada</div>
+      <div class="ticket">
+        <div class="ct b sm">Farmacia Franco - Central</div>
+        <div class="blank-sm"></div>
+        <div class="ct big">M003</div>
+        <div class="blank-sm"></div>
+        <div class="ct b">Retirada de Mercadería</div>
+        <div class="ct b">Retirada de Mercadoria</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">08/04/2026 16:25</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">Gracias por su espera</div>
+        <div class="ct sm">Obrigado pela espera</div>
+      </div>
+    </div>
+
+    <!-- ────────── TICKET CON ATENDIENTE ELEGIDO ────────── -->
+    <div class="ticket-wrap">
+      <div class="ticket-label" style="color:#ffa726;">⭐ Con atendiente elegido</div>
+      <div class="ticket">
+        <div class="ct b sm">Farmacia Franco - Central</div>
+        <div class="blank-sm"></div>
+        <div class="ct big">F012</div>
+        <div class="blank-sm"></div>
+        <div class="ct b">Farmacia General</div>
+        <div class="ct b">Farmácia Geral</div>
+        <div class="blank-sm"></div>
+        <div class="ct b" style="font-size:14px;">Atendiente: Emiliana</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">08/04/2026 16:32</div>
+        <div class="blank-sm"></div>
+        <div class="ct sm">Gracias por su espera</div>
+        <div class="ct sm">Obrigado pela espera</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COLUMNA DERECHA: info y guía para modificar -->
+  <div class="info">
+    <h2>Cómo modificar el ticket</h2>
+
+    <div class="section">
+      <p>
+        El código que genera el ticket está en
+        <code>services/printer.js</code>, en el bloque
+        <code>printer.align('ct')...</code> dentro de la función
+        <code>printTicket()</code>.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2 style="font-size:11pt;border:none;padding:0;margin-bottom:6px;">Estructura actual</h2>
+      <ul>
+        <li><span class="tag">1</span>Nombre de la sucursal (negrita, centrado)</li>
+        <li><span class="tag">2</span>"TURNO / SENHA" (título)</li>
+        <li><span class="tag">3</span>Código del turno en tamaño grande (F001, T007, M003...)</li>
+        <li><span class="tag">4</span>Nombre del servicio en ES y PT</li>
+        <li><span class="tag">5</span>Fecha, hora y personas en espera (alineado izq.)</li>
+        <li><span class="tag">6</span>Mensaje de despedida bilingüe</li>
+        <li><span class="tag bw">·</span>Feed de 5 líneas y corte de papel</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2 style="font-size:11pt;border:none;padding:0;margin-bottom:6px;">Comandos ESC/POS disponibles</h2>
+      <ul>
+        <li><code>.align('ct' | 'lt' | 'rt')</code> — alineación</li>
+        <li><code>.style('b' | 'u' | 'bu' | 'normal')</code> — negrita, subrayado</li>
+        <li><code>.size(w, h)</code> — tamaño (1-8)</li>
+        <li><code>.text('...')</code> — línea de texto</li>
+        <li><code>.feed(n)</code> — n líneas en blanco</li>
+        <li><code>.drawLine()</code> — línea horizontal</li>
+        <li><code>.image(img)</code> — imagen/logo</li>
+        <li><code>.qrimage('...')</code> — código QR</li>
+        <li><code>.barcode('...')</code> — código de barras</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2 style="font-size:11pt;border:none;padding:0;margin-bottom:6px;">Ideas para mejorar</h2>
+      <ul>
+        <li>Agregar un logo de la farmacia arriba</li>
+        <li>Aumentar el tamaño del código de turno</li>
+        <li>Agregar una línea divisoria entre secciones</li>
+        <li>QR con la URL del display para ver en el celular</li>
+        <li>Mostrar solo la hora (sin fecha) en un tamaño más grande</li>
+        <li>Agregar el nombre del operador asignado si es "Elegir Atendiente"</li>
+      </ul>
+    </div>
+
+    <p class="legend">
+      Nota: este es solo un preview visual. El ancho real del papel es 80mm
+      (72mm imprimibles). La impresora usa fuente monoespaciada con 42
+      caracteres por línea en Font A.
+    </p>
+  </div>
+
+</div>
+
+</body>
+</html>
