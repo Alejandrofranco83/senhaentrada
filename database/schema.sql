@@ -76,6 +76,33 @@ CREATE TABLE IF NOT EXISTS daily_sequence (
     FOREIGN KEY (service_id) REFERENCES services(id)
 );
 
+-- Avisos / anuncios para reproducir en el display
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('tts', 'audio')),
+    content TEXT,               -- texto para TTS
+    filename TEXT,              -- archivo de audio
+    lang TEXT DEFAULT 'both',   -- 'pt', 'es', 'both'
+    active INTEGER DEFAULT 1,
+    schedule_type TEXT DEFAULT 'manual',  -- 'manual', 'interval', 'time'
+    schedule_interval INTEGER,            -- minutos entre reproducciones
+    schedule_time TEXT,                   -- HH:MM para reproducción diaria fija
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+);
+
+-- Publicidades para la pantalla de display
+CREATE TABLE IF NOT EXISTS media_ads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('image', 'video')),
+    filename TEXT NOT NULL,
+    duration INTEGER DEFAULT 8,
+    sort_order INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
 CREATE INDEX IF NOT EXISTS idx_tickets_service_status ON tickets(service_id, status);

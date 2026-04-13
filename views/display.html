@@ -8,27 +8,25 @@
   <style>
     body { overflow: hidden; margin: 0; }
 
-    .display-page {
+    #displayPage {
       height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
-    /* Header: compact, one line */
+    /* ── TOPBAR ─────────────────────────────────────────── */
     .display-topbar {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       padding: 0.5rem 1.5rem;
-      background: var(--bg-card);
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(26,26,26,0.92);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
       flex-shrink: 0;
-    }
-
-    .display-topbar-left {
-      display: flex;
-      align-items: center;
       gap: 1rem;
+      position: relative;
+      z-index: 50;
     }
 
     .display-topbar img { height: 45px; }
@@ -39,45 +37,123 @@
     }
 
     .display-topbar h1 .pt {
-      font-size: 0.75em;
+      font-size: 1em;
       color: var(--text-muted);
-      font-style: italic;
-      font-weight: 400;
+      font-style: normal;
+      font-weight: 800;
     }
 
-    /* Main area: 2 columns of tickets */
-    .display-body {
+    /* ── CONTENT ─────────────────────────────────────────── */
+    .display-content {
       flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── ADS — full-screen background ───────────────────── */
+    .ads-wrap {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      z-index: 1;
+    }
+
+    .ads-panel {
+      position: absolute;
+      inset: 0;
+    }
+
+    .ad-slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.9s ease;
+    }
+
+    .ad-slide.active { opacity: 1; }
+
+    .ad-slide img   { width: 100%; height: 100%; object-fit: cover; }
+    .ad-slide video { width: 100%; height: 100%; object-fit: cover; }
+
+    .ads-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      pointer-events: none;
+    }
+
+    .ads-empty img            { height: 120px; opacity: 0.12; }
+    .ads-empty .ads-empty-name {
+      font-size: 2.2rem;
+      font-weight: 700;
+      opacity: 0.1;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* ── TICKETS OVERLAY — glass cards, top-left ─────────── */
+    .tickets-panel {
+      position: absolute;
+      top: 0.9rem;
+      left: 0.9rem;
+      width: 54%;
+      max-height: calc(100% - 1.8rem);
+      z-index: 20;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.7s ease;
+      pointer-events: none;
+    }
+
+    #displayPage[data-state="queue"] .tickets-panel {
+      opacity: 1;
+    }
+
+    .display-body {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.6rem;
-      padding: 0.6rem;
-      min-height: 0;
+      gap: 0.55rem;
+      align-content: start;
     }
 
-    /* Each ticket card */
+    /* Glass card */
     .display-ticket {
-      background: var(--bg-card);
+      background: rgba(8, 8, 8, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-top: 3px solid transparent;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 1rem 2rem;
-      transition: all 0.3s;
+      padding: 1rem 1.7rem;
     }
 
+    /* Ticket arrives from center — subtle scale-in */
     .display-ticket.highlight {
-      animation: pulseHighlight 1s ease-in-out 10;
-      border: 3px solid var(--accent);
+      border-top-color: var(--accent);
+      animation:
+        ticketArrive   0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+        pulseHighlight 1s   ease-in-out 5 0.55s;
     }
 
-    .display-ticket .ticket-left {
-      display: flex;
-      flex-direction: column;
+    @keyframes ticketArrive {
+      from { transform: scale(1.06); }
+      to   { transform: scale(1); }
     }
+
+    .display-ticket .ticket-left { display: flex; flex-direction: column; }
 
     .display-ticket .ticket-code {
-      font-size: 4.5rem;
+      font-size: 4.55rem;
       font-weight: 900;
       letter-spacing: 3px;
       line-height: 1;
@@ -85,109 +161,177 @@
 
     .display-ticket .ticket-service {
       font-size: 1.1rem;
-      color: var(--text-muted);
-      margin-top: 6px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
     }
 
     .display-ticket .arrow {
-      font-size: 3rem;
-      color: var(--text-muted);
-      margin: 0 1rem;
+      font-size: 2.65rem;
+      color: rgba(255,255,255,0.3);
+      margin: 0 0.6rem;
+      flex-shrink: 0;
     }
 
-    .display-ticket .ticket-counter {
-      text-align: right;
-    }
+    .display-ticket .ticket-counter { text-align: right; flex-shrink: 0; }
 
     .display-ticket .counter-label {
       font-size: 1rem;
-      color: var(--text-muted);
+      color: rgba(255,255,255,0.4);
     }
 
     .display-ticket .counter-number {
-      font-size: 4.5rem;
+      font-size: 4.55rem;
       font-weight: 800;
       line-height: 1;
     }
 
-    /* Empty state */
     .display-empty {
       grid-column: 1 / -1;
       display: flex;
       align-items: center;
       justify-content: center;
-      opacity: 0.4;
-      font-size: 1.3rem;
+      opacity: 0.35;
+      font-size: 1.1rem;
+      padding: 2rem;
     }
 
-    /* Bottom: waiting stats */
-    .display-footer {
-      display: flex;
-      gap: 0.5rem;
-      padding: 0.6rem 1rem;
-      flex-shrink: 0;
-      background: var(--bg-card);
-      border-top: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .display-footer .stat {
-      flex: 1;
+    /* ── CENTER TICKET ANNOUNCEMENT ──────────────────────── */
+    /* position:fixed so it sits above the red snackbar too   */
+    .ticket-announce {
+      position: fixed;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      padding: 0.4rem;
-      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.86);
+      z-index: 8500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.55s ease;
     }
 
-    .display-footer .stat .icon { font-size: 1.8rem; }
-
-    .display-footer .stat .count {
-      font-size: 2.2rem;
-      font-weight: 800;
+    .ticket-announce.show {
+      opacity: 1;
     }
 
-    .display-footer .stat .label {
+    /* Inner content box */
+    .ta-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+      width: 100%;
+      max-width: 1300px;
+      padding: 2rem 3rem;
+      text-align: center;
+    }
+
+    .ticket-announce.show .ta-inner {
+      animation: taEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes taEnter {
+      from { transform: scale(0.88) translateY(24px); opacity: 0; }
+      to   { transform: scale(1) translateY(0);       opacity: 1; }
+    }
+
+    .ta-badge {
       font-size: 1rem;
-      color: var(--text-muted);
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .ta-separator {
+      width: 70%;
+      height: 2px;
+      background: linear-gradient(to right, transparent, rgba(212,32,39,0.45), transparent);
+    }
+
+    /* The big ticket code — scales with viewport width */
+    .ta-code {
+      font-size: clamp(8rem, 20vw, 16rem);
+      font-weight: 900;
+      letter-spacing: 10px;
+      line-height: 1;
+      /* color set by JS */
+    }
+
+    .ta-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3.5rem;
+      width: 75%;
+      margin-top: 0.5rem;
+    }
+
+    .ta-service { text-align: left; }
+
+    .ta-service-name {
+      font-size: clamp(1.4rem, 2.8vw, 2.4rem);
+      font-weight: 700;
       line-height: 1.2;
     }
 
-    @keyframes pulseHighlight {
-      0%, 100% { box-shadow: none; border-color: var(--accent); }
-      50% { box-shadow: 0 0 35px rgba(212, 32, 39, 0.6); border-color: #ff4444; }
+    .ta-service-pt {
+      font-size: clamp(1.1rem, 2.2vw, 1.8rem);
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.2;
     }
 
-    /* Snackbar de aviso */
+    .ta-arrow {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      color: rgba(255,255,255,0.25);
+      flex-shrink: 0;
+    }
+
+    .ta-counter { text-align: center; flex-shrink: 0; }
+
+    .ta-counter-label {
+      font-size: 1rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+
+    .ta-counter-num {
+      font-size: clamp(4.5rem, 9vw, 8rem);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────────────── */
+    @keyframes pulseHighlight {
+      0%, 100% { border-top-color: var(--accent); box-shadow: none; }
+      50%  { border-top-color: #ff4444; box-shadow: 0 0 28px rgba(212,32,39,0.4); }
+    }
+
+    /* ── SNACKBAR ────────────────────────────────────────── */
     .display-snackbar {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 30vh;
+      left: 0; right: 0; bottom: 0;
       background: linear-gradient(135deg, #d42027 0%, #8b1419 100%);
       color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 1rem 2rem;
-      box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6);
+      padding: 0.55rem 2rem;
+      box-shadow: 0 -8px 30px rgba(0,0,0,0.6);
       transform: translateY(100%);
       transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
       z-index: 8000;
       border-top: 4px solid #fff;
     }
 
-    .display-snackbar.show {
-      transform: translateY(0);
-    }
+    .display-snackbar.show { transform: translateY(0); }
 
     .display-snackbar .snackbar-content {
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-      max-width: 95%;
+      display: flex; align-items: center; gap: 2rem; max-width: 95%;
     }
 
     .display-snackbar .snackbar-icon {
@@ -199,19 +343,20 @@
       font-size: 4rem;
       font-weight: 800;
       line-height: 1.15;
-      text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.5);
-      letter-spacing: 0.5px;
+      text-shadow: 2px 2px 6px rgba(0,0,0,0.5);
     }
 
     @keyframes snackbarPulse {
       0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.15); }
+      50%  { transform: scale(1.15); }
     }
   </style>
 </head>
 <body>
   <!-- Audio activation overlay -->
-  <div id="audioOverlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;" onclick="activateAudio()">
+  <div id="audioOverlay"
+    style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;"
+    onclick="activateAudio()">
     <img src="/img/logo.png" alt="Farmacia Franco" style="height:80px;margin-bottom:2rem;">
     <div style="font-size:2.5rem;font-weight:700;">Activar Pantalla</div>
     <div style="font-size:1.8rem;color:var(--text-muted);margin-top:0.5rem;">Ativar Tela</div>
@@ -221,29 +366,66 @@
     </div>
   </div>
 
-  <div class="display-page">
-    <!-- Top bar -->
+  <div id="displayPage" data-state="idle">
+
+    <!-- Topbar -->
     <div class="display-topbar">
-      <div class="display-topbar-left">
-        <img src="/img/logo.png" alt="Farmacia Franco">
-        <h1>Turnos <span class="pt">/ Senhas</span></h1>
+      <img src="/img/logo.png" alt="Farmacia Franco">
+      <h1>Turnos <span class="pt">/ Senhas</span></h1>
+    </div>
+
+    <!-- Content: ad fills 100%, tickets float on top -->
+    <div class="display-content" id="displayContent">
+
+      <!-- ① Ads — full-screen background (always running) -->
+      <div class="ads-wrap" id="adsWrap">
+        <div class="ads-panel" id="adsPanel">
+          <div class="ads-empty" id="adsEmpty">
+            <img src="/img/logo.png" alt="">
+            <div class="ads-empty-name">Farmacia Franco</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ② Tickets — glass overlay (visible in queue state) -->
+      <div class="tickets-panel" id="ticketsPanel">
+        <div class="display-body" id="calledList">
+          <div class="display-empty">Esperando turnos... / Aguardando senhas...</div>
+        </div>
+      </div>
+
+    </div><!-- /display-content -->
+
+  </div><!-- /displayPage -->
+
+  <!-- ③ Center announcement (fixed, covers snackbar too) -->
+  <div class="ticket-announce" id="ticketAnnounce">
+    <div class="ta-inner">
+      <div class="ta-badge">📢 Turno / Senha</div>
+      <div class="ta-separator"></div>
+      <div class="ta-code" id="taCode">F001</div>
+      <div class="ta-separator"></div>
+      <div class="ta-footer">
+        <div class="ta-service">
+          <div class="ta-service-name" id="taService">Farmacia General</div>
+          <div class="ta-service-pt"   id="taServicePt">Farmácia Geral</div>
+        </div>
+        <div class="ta-arrow">→</div>
+        <div class="ta-counter">
+          <div class="ta-counter-label">Caja / Caixa</div>
+          <div class="ta-counter-num" id="taNum">3</div>
+        </div>
       </div>
     </div>
-
-    <!-- Tickets grid (2 columns) -->
-    <div class="display-body" id="calledList">
-      <div class="display-empty">Esperando turnos... / Aguardando senhas...</div>
-    </div>
-
-    <!-- Waiting stats footer -->
-    <div class="display-footer" id="waitingStats"></div>
   </div>
 
-  <!-- Snackbar de aviso -->
+  <!-- Snackbar periódico -->
   <div class="display-snackbar" id="warningSnackbar">
     <div class="snackbar-content">
       <div class="snackbar-icon">⚠️</div>
-      <div class="snackbar-text">Por favor, verifique sua mercadoria,<br>não aceitamos reclamos posteriores</div>
+      <div class="snackbar-text">
+        Por favor, verifique sua mercadoria,<br>não aceitamos reclamos posteriores
+      </div>
     </div>
   </div>
 
@@ -253,19 +435,16 @@
     (function () {
       var snackbar = document.getElementById('warningSnackbar');
       if (!snackbar) return;
-      var VISIBLE_MS = 10000; // tiempo visible (arriba)
-      var HIDDEN_MS = 4000;   // tiempo escondido (abajo)
-
+      var VISIBLE_MS = 10000;
+      var HIDDEN_MS  = 7000;
       function showSnackbar() {
         snackbar.classList.add('show');
         setTimeout(hideSnackbar, VISIBLE_MS);
       }
-
       function hideSnackbar() {
         snackbar.classList.remove('show');
         setTimeout(showSnackbar, HIDDEN_MS);
       }
-
       showSnackbar();
     })();
   </script>

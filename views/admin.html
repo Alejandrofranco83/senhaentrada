@@ -30,6 +30,8 @@
       <button class="tab" onclick="showSection('services')">Servicios</button>
       <button class="tab" onclick="showSection('operators')">Operadores</button>
       <button class="tab" onclick="showSection('queue')">Cola Actual</button>
+      <button class="tab" onclick="showSection('ads')">Publicidad</button>
+      <button class="tab" onclick="showSection('announcements')">Avisos</button>
     </div>
 
     <!-- Stats Section -->
@@ -134,6 +136,174 @@
           </thead>
           <tbody id="queueTable"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+    <!-- Ads Section -->
+    <div class="admin-section" id="section-ads">
+      <div class="card">
+        <div class="flex justify-between items-center mb-2">
+          <h3>Publicidad en Display</h3>
+          <label class="btn btn-success" style="font-size:0.85rem;cursor:pointer;">
+            + Subir Imagen / Video
+            <input type="file" id="adFileInput" accept="image/*,video/*" style="display:none;" onchange="uploadAdFile(this)">
+          </label>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+          Las publicidades activas se muestran en el panel derecho de la pantalla de display. Imágenes: JPG, PNG, GIF, WebP. Videos: MP4, WebM, MOV. Máx 200 MB.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Vista previa</th>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Duración (seg)</th>
+              <th>Orden</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="adsTable"></tbody>
+        </table>
+
+        <!-- Upload progress -->
+        <div id="adUploadStatus" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:var(--bg);border-radius:8px;font-size:0.9rem;">
+          <span id="adUploadText">Subiendo...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Announcements Section -->
+    <div class="admin-section" id="section-announcements">
+      <div class="card">
+        <div class="flex justify-between items-center mb-2">
+          <h3>Avisos / Anúncios</h3>
+          <div class="flex gap-1">
+            <button class="btn btn-info"    style="font-size:0.85rem;" onclick="openAnnouncementModal(null, 'tts')">+ Texto / Voz</button>
+            <label  class="btn btn-purple"  style="font-size:0.85rem;cursor:pointer;">
+              🎵 Subir Audio
+              <input type="file" id="annAudioInput" accept=".mp3,.wav,.ogg,.m4a,.aac" style="display:none;" onchange="uploadAnnouncementAudio(this)">
+            </label>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">
+          Los avisos de texto son leídos por la voz del display (PT primero, luego ES). Los audios se reproducen directamente por los parlantes de la TV.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Tipo</th>
+              <th>Idioma</th>
+              <th>Progr.</th>
+              <th>Contenido</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="announcementsTable"></tbody>
+        </table>
+        <div id="annUploadStatus" style="display:none;margin-top:1rem;padding:0.75rem 1rem;background:var(--bg);border-radius:8px;font-size:0.9rem;"></div>
+      </div>
+    </div>
+
+  <!-- Modal: Announcement -->
+  <div class="modal-overlay" id="announcementModal">
+    <div class="modal">
+      <h3 id="annModalTitle">Nuevo Aviso de Voz</h3>
+
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="annTitle" placeholder="Ej: Promoción Junio, Llamado a retirar pedido...">
+      </div>
+
+      <div class="form-group" id="annContentGroup">
+        <label>Texto a leer</label>
+        <textarea id="annContent" rows="4"
+          style="width:100%;padding:0.65rem 0.85rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);font-size:1rem;resize:vertical;"
+          placeholder="Escribí el texto tal como querés que lo diga la voz..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Idioma</label>
+        <select id="annLang">
+          <option value="both">Portugués + Español</option>
+          <option value="pt">Solo Portugués</option>
+          <option value="es">Solo Español</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Programación automática</label>
+        <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+            <input type="radio" name="annScheduleType" value="manual" checked>
+            <span>Manual — solo al hacer clic en Reproducir</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+            <input type="radio" name="annScheduleType" value="interval">
+            <span>Cada</span>
+            <input type="number" id="annInterval" min="1" max="1440" value="30"
+              style="width:64px;padding:0.3rem 0.5rem;border-radius:6px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);"
+              onfocus="document.querySelector('[name=annScheduleType][value=interval]').checked=true">
+            <span>minutos</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+            <input type="radio" name="annScheduleType" value="time">
+            <span>A las</span>
+            <input type="time" id="annTime" value="09:00"
+              style="padding:0.3rem 0.5rem;border-radius:6px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);"
+              onfocus="document.querySelector('[name=annScheduleType][value=time]').checked=true">
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeAnnouncementModal()">Cancelar</button>
+        <button class="btn btn-purple"    onclick="saveAnnouncement()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Ad (Editar) -->
+  <div class="modal-overlay" id="adModal">
+    <div class="modal">
+      <h3 id="adModalTitle">Editar Publicidad</h3>
+
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="adTitle" placeholder="Ej: Promoción Junio">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Duración (segundos)</label>
+          <input type="number" id="adDuration" min="2" max="60" value="8">
+          <small style="color:var(--text-muted);font-size:0.75rem;">Solo para imágenes. Los videos usan su duración real.</small>
+        </div>
+        <div class="form-group">
+          <label>Orden de visualización</label>
+          <input type="number" id="adOrder" min="0" value="0">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-toggle">
+          <div class="toggle-info">
+            <span class="toggle-title">Publicidad activa</span>
+            <span class="toggle-hint">Si está apagado, no se muestra en el display</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="adActive" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeAdModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="saveAd()">Guardar</button>
       </div>
     </div>
   </div>

@@ -46,6 +46,10 @@ function setupSocket(io) {
 
     emitCounterUpdated(counters) {
       io.emit('counter:updated', counters);
+    },
+
+    emitAnnouncementPlay(data) {
+      io.emit('announcement:play', data);
     }
   };
 }

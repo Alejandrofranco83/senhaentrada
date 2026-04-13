@@ -28,6 +28,52 @@ try {
   db.prepare("ALTER TABLE operators ADD COLUMN photo TEXT").run();
 }
 
+try {
+  db.prepare("SELECT id FROM announcements LIMIT 1").get();
+} catch (e) {
+  db.exec(`CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL,
+    content TEXT,
+    filename TEXT,
+    lang TEXT DEFAULT 'both',
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+}
+
+try {
+  db.prepare("SELECT id FROM media_ads LIMIT 1").get();
+} catch (e) {
+  db.exec(`CREATE TABLE IF NOT EXISTS media_ads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    type TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    duration INTEGER DEFAULT 8,
+    sort_order INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+}
+
+try {
+  db.prepare("SELECT schedule_type FROM announcements LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE announcements ADD COLUMN schedule_type TEXT DEFAULT 'manual'").run();
+}
+try {
+  db.prepare("SELECT schedule_interval FROM announcements LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE announcements ADD COLUMN schedule_interval INTEGER").run();
+}
+try {
+  db.prepare("SELECT schedule_time FROM announcements LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE announcements ADD COLUMN schedule_time TEXT").run();
+}
+
 // Seed default data if empty
 function seedDefaults(config) {
   const branchCount = db.prepare('SELECT COUNT(*) as c FROM branch').get().c;

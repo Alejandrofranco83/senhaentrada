@@ -26,6 +26,8 @@ function showSection(name) {
   if (name === 'services') loadServices();
   if (name === 'operators') loadOperators();
   if (name === 'queue') loadQueue();
+  if (name === 'ads') loadAds();
+  if (name === 'announcements') loadAnnouncements();
 }
 
 // ─── STATS ───────────────────────────────────────────
@@ -427,6 +429,292 @@ async function loadQueue() {
       </tr>
     `;
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Sin turnos / Sem senhas</td></tr>';
+}
+
+// ─── ADS ─────────────────────────────────────────────
+let adsCache = [];
+let editingAdId = null;
+
+async function loadAds() {
+  adsCache = await fetch('/api/ads?all=true').then(r => r.json());
+
+  document.getElementById('adsTable').innerHTML = adsCache.length === 0
+    ? '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Sin publicidades. Sube una imagen o video con el botón de arriba.</td></tr>'
+    : adsCache.map(ad => {
+      const preview = ad.type === 'video'
+        ? `<video src="/img/ads/${ad.filename}" style="height:54px;border-radius:6px;background:#000;" muted></video>`
+        : `<img src="/img/ads/${ad.filename}" style="height:54px;border-radius:6px;object-fit:cover;max-width:90px;" alt="${ad.title}">`;
+      return `
+        <tr style="${ad.active ? '' : 'opacity:0.5;'}">
+          <td>${preview}</td>
+          <td style="font-weight:600;">${ad.title}</td>
+          <td>${ad.type === 'video' ? '🎬 Video' : '🖼️ Imagen'}</td>
+          <td>${ad.type === 'video' ? '<i style="color:var(--text-muted)">auto</i>' : ad.duration + 's'}</td>
+          <td>${ad.sort_order}</td>
+          <td>${ad.active ? '✅ Activa' : '⏸️ Inactiva'}</td>
+          <td>
+            <button class="btn btn-info" style="padding:4px 12px;font-size:0.8rem;" onclick="openAdModal(${ad.id})">Editar</button>
+            <button class="btn btn-danger" style="padding:4px 12px;font-size:0.8rem;" onclick="deleteAd(${ad.id})">Eliminar</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+}
+
+async function uploadAdFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('adUploadStatus');
+  const textEl = document.getElementById('adUploadText');
+  statusEl.style.display = 'block';
+  textEl.textContent = `Subiendo "${file.name}"...`;
+
+  const formData = new FormData();
+  formData.append('media', file);
+
+  try {
+    const uploadRes = await fetch('/api/ads/upload', { method: 'POST', body: formData }).then(r => r.json());
+    if (uploadRes.error) throw new Error(uploadRes.error);
+
+    // Auto-create the ad record
+    const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+    const createRes = await fetch('/api/ads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        type: uploadRes.type,
+        filename: uploadRes.filename,
+        duration: 8,
+        sort_order: adsCache.length
+      })
+    }).then(r => r.json());
+
+    if (createRes.error) throw new Error(createRes.error);
+
+    textEl.textContent = `✅ "${title}" subida correctamente.`;
+    input.value = '';
+    loadAds();
+    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+  } catch (err) {
+    textEl.textContent = `❌ Error: ${err.message}`;
+    setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+  }
+}
+
+function openAdModal(id) {
+  editingAdId = id;
+  const ad = adsCache.find(a => a.id === id);
+  if (!ad) return;
+
+  document.getElementById('adModalTitle').textContent = `Editar: ${ad.title}`;
+  document.getElementById('adTitle').value = ad.title;
+  document.getElementById('adDuration').value = ad.duration || 8;
+  document.getElementById('adOrder').value = ad.sort_order || 0;
+  document.getElementById('adActive').checked = !!ad.active;
+
+  document.getElementById('adModal').classList.add('active');
+}
+
+function closeAdModal() {
+  document.getElementById('adModal').classList.remove('active');
+  editingAdId = null;
+}
+
+async function saveAd() {
+  const ad = adsCache.find(a => a.id === editingAdId);
+  if (!ad) return;
+
+  await fetch(`/api/ads/${editingAdId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: document.getElementById('adTitle').value.trim() || ad.title,
+      duration: parseInt(document.getElementById('adDuration').value) || 8,
+      sort_order: parseInt(document.getElementById('adOrder').value) || 0,
+      active: document.getElementById('adActive').checked ? 1 : 0
+    })
+  });
+
+  closeAdModal();
+  loadAds();
+}
+
+async function deleteAd(id) {
+  const ad = adsCache.find(a => a.id === id);
+  if (!ad || !confirm(`¿Eliminar la publicidad "${ad.title}"? Esto también borra el archivo.`)) return;
+
+  await fetch(`/api/ads/${id}`, { method: 'DELETE' });
+  loadAds();
+}
+
+// Cerrar modal de ads al hacer click fuera
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'adModal') closeAdModal();
+  if (e.target.id === 'announcementModal') closeAnnouncementModal();
+});
+
+// ─── ANNOUNCEMENTS ────────────────────────────────────
+let announcementsCache = [];
+let editingAnnId       = null;
+let editingAnnType     = null;
+
+const LANG_LABELS = { both: '🌐 PT + ES', pt: '🇧🇷 PT', es: '🇦🇷 ES' };
+
+async function loadAnnouncements() {
+  announcementsCache = await fetch('/api/announcements?all=true').then(r => r.json());
+
+  document.getElementById('announcementsTable').innerHTML = announcementsCache.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Sin avisos. Agregá un texto de voz o subí un audio.</td></tr>'
+    : announcementsCache.map(a => {
+        const typeLabel = a.type === 'audio' ? '🎵 Audio' : '🗣️ Voz';
+        const schedLabel = a.schedule_type === 'interval' && a.schedule_interval
+          ? `<span style="color:var(--info);font-size:0.8rem;">⏱ cada ${a.schedule_interval} min</span>`
+          : a.schedule_type === 'time' && a.schedule_time
+          ? `<span style="color:var(--info);font-size:0.8rem;">🕐 ${a.schedule_time}</span>`
+          : '<span style="color:var(--text-muted);font-size:0.8rem;">—</span>';
+        const preview = a.type === 'audio'
+          ? `<audio controls src="/audio/announcements/${a.filename}" style="height:32px;max-width:220px;"></audio>`
+          : `<span style="color:var(--text-muted);font-size:0.85rem;">${(a.content || '').slice(0, 60)}${a.content?.length > 60 ? '…' : ''}</span>`;
+        const editBtn = `<button class="btn btn-info" style="padding:4px 10px;font-size:0.8rem;" onclick="openAnnouncementModal(${a.id})">Editar</button>`;
+        return `
+          <tr>
+            <td style="font-weight:600;">${a.title}</td>
+            <td>${typeLabel}</td>
+            <td>${LANG_LABELS[a.lang] || a.lang}</td>
+            <td>${schedLabel}</td>
+            <td>${preview}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-success" style="padding:4px 12px;font-size:0.8rem;" onclick="playAnnouncement(${a.id})">▶ Reproducir</button>
+              ${editBtn}
+              <button class="btn btn-danger"  style="padding:4px 10px;font-size:0.8rem;" onclick="deleteAnnouncement(${a.id})">Eliminar</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+}
+
+async function playAnnouncement(id) {
+  const btn = event.target;
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  await fetch(`/api/announcements/${id}/play`, { method: 'POST' });
+  btn.textContent = '✅';
+  setTimeout(() => { btn.textContent = '▶ Reproducir'; btn.disabled = false; }, 1500);
+}
+
+async function uploadAnnouncementAudio(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('annUploadStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent   = `Subiendo "${file.name}"...`;
+
+  const formData = new FormData();
+  formData.append('audio', file);
+
+  try {
+    const up = await fetch('/api/announcements/upload-audio', { method: 'POST', body: formData }).then(r => r.json());
+    if (up.error) throw new Error(up.error);
+
+    const title = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+    const cr = await fetch('/api/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, type: 'audio', filename: up.filename, lang: 'both' })
+    }).then(r => r.json());
+    if (cr.error) throw new Error(cr.error);
+
+    statusEl.textContent = `✅ "${title}" subido. Podés configurar la programación ahora.`;
+    input.value = '';
+    await loadAnnouncements();
+    openAnnouncementModal(cr.id);
+    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+  } catch (err) {
+    statusEl.textContent = `❌ Error: ${err.message}`;
+    setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+  }
+}
+
+function openAnnouncementModal(id, forceType) {
+  editingAnnId   = id || null;
+  const a        = id ? announcementsCache.find(x => x.id === id) : null;
+  editingAnnType = a?.type || forceType || 'tts';
+
+  const isAudio = editingAnnType === 'audio';
+  document.getElementById('annModalTitle').textContent = a
+    ? (isAudio ? 'Editar Aviso de Audio' : 'Editar Aviso de Voz')
+    : 'Nuevo Aviso de Voz';
+
+  document.getElementById('annTitle').value   = a?.title   || '';
+  document.getElementById('annContent').value = a?.content || '';
+  document.getElementById('annLang').value    = a?.lang    || 'both';
+
+  // Hide content textarea for audio announcements
+  document.getElementById('annContentGroup').style.display = isAudio ? 'none' : '';
+
+  const schedType = a?.schedule_type || 'manual';
+  const radio = document.querySelector(`[name="annScheduleType"][value="${schedType}"]`);
+  if (radio) radio.checked = true;
+  document.getElementById('annInterval').value = a?.schedule_interval || 30;
+  document.getElementById('annTime').value     = a?.schedule_time     || '09:00';
+
+  document.getElementById('announcementModal').classList.add('active');
+}
+
+function closeAnnouncementModal() {
+  document.getElementById('announcementModal').classList.remove('active');
+  editingAnnId   = null;
+  editingAnnType = null;
+}
+
+async function saveAnnouncement() {
+  const title    = document.getElementById('annTitle').value.trim();
+  const content  = document.getElementById('annContent').value.trim();
+  const lang     = document.getElementById('annLang').value;
+  const schedType = document.querySelector('[name="annScheduleType"]:checked')?.value || 'manual';
+  const schedInterval = schedType === 'interval'
+    ? (parseInt(document.getElementById('annInterval').value) || 30)
+    : null;
+  const schedTime = schedType === 'time'
+    ? document.getElementById('annTime').value
+    : null;
+
+  if (!title) { alert('El título es obligatorio'); return; }
+  if (!content && editingAnnType !== 'audio') { alert('El texto es obligatorio'); return; }
+
+  const payload = {
+    title, content: editingAnnType === 'audio' ? null : content, lang, active: 1,
+    schedule_type: schedType,
+    schedule_interval: schedInterval,
+    schedule_time: schedTime
+  };
+
+  if (editingAnnId) {
+    await fetch(`/api/announcements/${editingAnnId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } else {
+    await fetch('/api/announcements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, type: 'tts' })
+    });
+  }
+
+  closeAnnouncementModal();
+  loadAnnouncements();
+}
+
+async function deleteAnnouncement(id) {
+  const a = announcementsCache.find(x => x.id === id);
+  if (!a || !confirm(`¿Eliminar el aviso "${a.title}"?`)) return;
+  await fetch(`/api/announcements/${id}`, { method: 'DELETE' });
+  loadAnnouncements();
 }
 
 // ─── SOCKET EVENTS ───────────────────────────────────

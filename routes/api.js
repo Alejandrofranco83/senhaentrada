@@ -2,9 +2,57 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 const { db } = require('../database/db');
 const queue = require('../services/queue');
 const { printTicket } = require('../services/printer');
+
+// Multer config for announcement audio uploads
+const audioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'public', 'audio', 'announcements'));
+  },
+  filename: (req, file, cb) => {
+    const ext  = path.extname(file.originalname).toLowerCase();
+    const name = `ann_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`;
+    cb(null, name);
+  }
+});
+const audioUpload = multer({
+  storage: audioStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (req, file, cb) => {
+    if (/\.(mp3|wav|ogg|m4a|aac)$/i.test(path.extname(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos de audio'));
+    }
+  }
+});
+
+// Multer config for ad media uploads
+const adsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '..', 'public', 'img', 'ads'));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const name = `ad_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`;
+    cb(null, name);
+  }
+});
+const adsUpload = multer({
+  storage: adsStorage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif|webp|mp4|webm|mov)$/i;
+    if (allowed.test(path.extname(file.originalname))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido'));
+    }
+  }
+});
 
 // Socket emitter gets injected from server.js
 let socketEmitter = null;
@@ -284,6 +332,111 @@ router.get('/stats/today', (req, res) => {
 
 router.get('/stats/summary', (req, res) => {
   res.json(queue.getQueueStats());
+});
+
+// ─── ANNOUNCEMENTS ───────────────────────────────────────
+router.get('/announcements', (req, res) => {
+  const sql = req.query.all === 'true'
+    ? 'SELECT * FROM announcements ORDER BY created_at DESC'
+    : 'SELECT * FROM announcements WHERE active = 1 ORDER BY created_at DESC';
+  res.json(db.prepare(sql).all());
+});
+
+router.post('/announcements/upload-audio', audioUpload.single('audio'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
+  res.json({ ok: true, filename: req.file.filename, url: `/audio/announcements/${req.file.filename}` });
+});
+
+router.post('/announcements', (req, res) => {
+  const { title, type, content, filename, lang, schedule_type, schedule_interval, schedule_time } = req.body;
+  if (!title || !type) return res.status(400).json({ error: 'title y type son requeridos' });
+  const result = db.prepare(
+    'INSERT INTO announcements (title, type, content, filename, lang, schedule_type, schedule_interval, schedule_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(title, type, content || null, filename || null, lang || 'both',
+        schedule_type || 'manual', schedule_interval || null, schedule_time || null);
+  res.json(db.prepare('SELECT * FROM announcements WHERE id = ?').get(result.lastInsertRowid));
+});
+
+router.put('/announcements/:id', (req, res) => {
+  const { title, content, lang, active, schedule_type, schedule_interval, schedule_time } = req.body;
+  db.prepare('UPDATE announcements SET title=?, content=?, lang=?, active=?, schedule_type=?, schedule_interval=?, schedule_time=? WHERE id=?')
+    .run(title, content, lang, active,
+         schedule_type || 'manual', schedule_interval || null, schedule_time || null,
+         req.params.id);
+  res.json(db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id));
+});
+
+router.delete('/announcements/:id', (req, res) => {
+  const ann = db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id);
+  if (!ann) return res.status(404).json({ error: 'No encontrado' });
+  if (ann.filename) {
+    const fp = path.join(__dirname, '..', 'public', 'audio', 'announcements', ann.filename);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  }
+  db.prepare('DELETE FROM announcements WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+router.post('/announcements/:id/play', (req, res) => {
+  const ann = db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id);
+  if (!ann) return res.status(404).json({ error: 'No encontrado' });
+  if (socketEmitter) socketEmitter.emitAnnouncementPlay({
+    type: ann.type,
+    content: ann.content,
+    filename: ann.filename,
+    lang: ann.lang,
+    title: ann.title
+  });
+  res.json({ ok: true });
+});
+
+// ─── ADS ─────────────────────────────────────────────────
+router.get('/ads', (req, res) => {
+  const sql = req.query.all === 'true'
+    ? 'SELECT * FROM media_ads ORDER BY sort_order, id'
+    : 'SELECT * FROM media_ads WHERE active = 1 ORDER BY sort_order, id';
+  res.json(db.prepare(sql).all());
+});
+
+router.post('/ads/upload', adsUpload.single('media'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
+
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  const videoExts = ['.mp4', '.webm', '.mov'];
+  const type = videoExts.includes(ext) ? 'video' : 'image';
+  const url = `/img/ads/${req.file.filename}`;
+
+  res.json({ ok: true, filename: req.file.filename, url, type });
+});
+
+router.post('/ads', (req, res) => {
+  const { title, type, filename, duration, sort_order } = req.body;
+  if (!title || !type || !filename) return res.status(400).json({ error: 'title, type y filename son requeridos' });
+
+  const result = db.prepare(
+    'INSERT INTO media_ads (title, type, filename, duration, sort_order) VALUES (?, ?, ?, ?, ?)'
+  ).run(title, type, filename, duration || 8, sort_order || 0);
+
+  res.json(db.prepare('SELECT * FROM media_ads WHERE id = ?').get(result.lastInsertRowid));
+});
+
+router.put('/ads/:id', (req, res) => {
+  const { title, duration, sort_order, active } = req.body;
+  db.prepare('UPDATE media_ads SET title=?, duration=?, sort_order=?, active=? WHERE id=?')
+    .run(title, duration, sort_order, active, req.params.id);
+  res.json(db.prepare('SELECT * FROM media_ads WHERE id = ?').get(req.params.id));
+});
+
+router.delete('/ads/:id', (req, res) => {
+  const ad = db.prepare('SELECT * FROM media_ads WHERE id = ?').get(req.params.id);
+  if (!ad) return res.status(404).json({ error: 'No encontrado' });
+
+  // Remove file from disk
+  const filePath = path.join(__dirname, '..', 'public', 'img', 'ads', ad.filename);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+  db.prepare('DELETE FROM media_ads WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 // ─── HELPERS ─────────────────────────────────────────────

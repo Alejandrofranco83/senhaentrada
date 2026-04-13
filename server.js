@@ -18,6 +18,7 @@ const io = new Server(server, {
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/audio', express.static(path.join(__dirname, 'public', 'audio')));
 
 // Serve socket.io client
 app.get('/socket.io/socket.io.js', (req, res) => {
