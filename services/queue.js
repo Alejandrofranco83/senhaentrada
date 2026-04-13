@@ -121,11 +121,12 @@ function callNextTicket(counterId) {
   const ticket = getNextTicket(counterId);
   if (!ticket) return null;
 
+  const counter = db.prepare('SELECT * FROM counters WHERE id = ?').get(counterId);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
   db.prepare(`
-    UPDATE tickets SET status = 'called', counter_id = ?, called_at = ? WHERE id = ?
-  `).run(counterId, now, ticket.id);
+    UPDATE tickets SET status = 'called', counter_id = ?, called_at = ?, serving_operator_id = ? WHERE id = ?
+  `).run(counterId, now, counter.operator_id || null, ticket.id);
 
   db.prepare(`
     UPDATE counters SET current_ticket_id = ?, status = 'busy' WHERE id = ?

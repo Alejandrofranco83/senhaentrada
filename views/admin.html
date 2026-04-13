@@ -32,6 +32,7 @@
       <button class="tab" onclick="showSection('queue')">Cola Actual</button>
       <button class="tab" onclick="showSection('ads')">Publicidad</button>
       <button class="tab" onclick="showSection('announcements')">Avisos</button>
+      <button class="tab" onclick="showSection('reports')">Reportes</button>
     </div>
 
     <!-- Stats Section -->
@@ -208,6 +209,88 @@
       </div>
     </div>
 
+  <!-- Reports Section -->
+  <div class="admin-section" id="section-reports">
+
+    <!-- Filters -->
+    <div class="card mb-2">
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end;">
+        <div class="form-group" style="margin:0;min-width:140px;">
+          <label style="font-size:0.8rem;">Desde</label>
+          <input type="date" id="rptFrom" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:100%;">
+        </div>
+        <div class="form-group" style="margin:0;min-width:140px;">
+          <label style="font-size:0.8rem;">Hasta</label>
+          <input type="date" id="rptTo" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:100%;">
+        </div>
+        <div class="form-group" style="margin:0;min-width:160px;">
+          <label style="font-size:0.8rem;">Servicio</label>
+          <select id="rptService" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:100%;">
+            <option value="">Todos los servicios</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;min-width:160px;">
+          <label style="font-size:0.8rem;">Operador</label>
+          <select id="rptOperator" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:100%;">
+            <option value="">Todos los operadores</option>
+          </select>
+        </div>
+        <button class="btn btn-success" onclick="runReport()">Generar</button>
+        <button class="btn btn-info"    onclick="exportReportCSV()">⬇ CSV</button>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div id="rptSummary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;"></div>
+
+    <!-- By service + By operator -->
+    <div class="grid-2 mb-2">
+      <div class="card">
+        <h3 class="mb-2">Por Servicio</h3>
+        <table>
+          <thead><tr><th>Servicio</th><th>Total</th><th>Atendidos</th><th>No-show</th><th>Espera prom.</th></tr></thead>
+          <tbody id="rptByService"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3 class="mb-2">Por Operador</h3>
+        <table>
+          <thead><tr><th>Operador</th><th>Total</th><th>Atendidos</th><th>No-show</th><th>Duración prom.</th></tr></thead>
+          <tbody id="rptByOperator"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- By hour chart -->
+    <div class="card mb-2">
+      <h3 class="mb-2">Distribución por Hora del Día</h3>
+      <div id="rptByHour"><p style="color:var(--text-muted);">Generá un reporte para ver los datos.</p></div>
+    </div>
+
+    <!-- Detailed ticket list -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-2">
+        <h3>Detalle de Turnos <span id="rptCount" style="color:var(--text-muted);font-size:0.9rem;font-weight:400;"></span></h3>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th><th>Servicio</th><th>Estado</th>
+              <th>Caja</th><th>Operador</th>
+              <th>Entrada</th><th>Llamado</th>
+              <th>Espera (min)</th><th>Duración (min)</th>
+            </tr>
+          </thead>
+          <tbody id="rptTickets">
+            <tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Seleccioná un período y hacé clic en Generar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
   <!-- Modal: Announcement -->
   <div class="modal-overlay" id="announcementModal">
     <div class="modal">
@@ -336,6 +419,12 @@
             <option value="2">Alta</option>
           </select>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>Descripción / Detalhes <span style="color:var(--text-muted);font-size:0.8rem;">(opcional — se muestra en el kiosko)</span></label>
+        <input type="text" id="svcDescription"
+          placeholder="Ej: Tirzepatida, remedios, perfumes, anabolizantes...">
       </div>
 
       <div class="form-group">

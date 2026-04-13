@@ -203,7 +203,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.86);
+      background: rgba(0, 0, 0, 0.62);
       z-index: 8500;
       opacity: 0;
       pointer-events: none;
@@ -214,16 +214,25 @@
       opacity: 1;
     }
 
-    /* Inner content box */
+    /* Inner content box — frosted glass card sized to content */
     .ta-inner {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 1.2rem;
-      width: 100%;
-      max-width: 1300px;
-      padding: 2rem 3rem;
+      width: auto;
+      padding: 3rem 5rem;
       text-align: center;
+
+      background: rgba(10, 10, 10, 0.82);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-top: 3px solid rgba(212, 32, 39, 0.7);
+      border-radius: 28px;
+      box-shadow:
+        0 12px 70px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
     }
 
     .ticket-announce.show .ta-inner {
@@ -263,7 +272,7 @@
       align-items: center;
       justify-content: center;
       gap: 3.5rem;
-      width: 75%;
+      width: 100%;
       margin-top: 0.5rem;
     }
 

@@ -70,19 +70,19 @@ router.get('/services', (req, res) => {
 });
 
 router.post('/services', (req, res) => {
-  const { name, name_pt, prefix, icon, color, priority, is_specific, sort_order } = req.body;
+  const { name, name_pt, prefix, icon, color, priority, is_specific, sort_order, description } = req.body;
   const result = db.prepare(
-    'INSERT INTO services (name, name_pt, prefix, icon, color, priority, is_specific, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(name, name_pt, prefix, icon, color, priority || 1, is_specific || 0, sort_order || 0);
+    'INSERT INTO services (name, name_pt, prefix, icon, color, priority, is_specific, sort_order, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(name, name_pt, prefix, icon, color, priority || 1, is_specific || 0, sort_order || 0, description || null);
   res.json(db.prepare('SELECT * FROM services WHERE id = ?').get(result.lastInsertRowid));
 });
 
 router.put('/services/:id', (req, res) => {
-  const { name, name_pt, prefix, icon, color, priority, is_specific, sort_order, active } = req.body;
+  const { name, name_pt, prefix, icon, color, priority, is_specific, sort_order, active, description } = req.body;
   db.prepare(`
-    UPDATE services SET name=?, name_pt=?, prefix=?, icon=?, color=?, priority=?, is_specific=?, sort_order=?, active=?
+    UPDATE services SET name=?, name_pt=?, prefix=?, icon=?, color=?, priority=?, is_specific=?, sort_order=?, active=?, description=?
     WHERE id=?
-  `).run(name, name_pt, prefix, icon, color, priority, is_specific, sort_order, active, req.params.id);
+  `).run(name, name_pt, prefix, icon, color, priority, is_specific, sort_order, active, description || null, req.params.id);
   res.json(db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id));
 });
 
@@ -388,6 +388,74 @@ router.post('/announcements/:id/play', (req, res) => {
     title: ann.title
   });
   res.json({ ok: true });
+});
+
+// ─── REPORTS ─────────────────────────────────────────
+router.get('/reports', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const { date_from = today, date_to = today, service_id, operator_id } = req.query;
+
+  const where  = ["date(t.created_at) BETWEEN ? AND ?"];
+  const params = [date_from, date_to];
+
+  if (service_id)  { where.push("t.service_id = ?");          params.push(service_id); }
+  if (operator_id) { where.push("t.serving_operator_id = ?"); params.push(operator_id); }
+
+  const w = where.join(' AND ');
+
+  const summary = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed,
+      COUNT(CASE WHEN t.status = 'no_show'   THEN 1 END) as no_show,
+      COUNT(CASE WHEN t.status = 'cancelled' THEN 1 END) as cancelled,
+      ROUND(AVG(CASE WHEN t.called_at IS NOT NULL
+        THEN (julianday(t.called_at) - julianday(t.created_at)) * 1440 END), 1) as avg_wait,
+      ROUND(AVG(CASE WHEN t.completed_at IS NOT NULL AND t.called_at IS NOT NULL
+        THEN (julianday(t.completed_at) - julianday(t.called_at)) * 1440 END), 1) as avg_service
+    FROM tickets t WHERE ${w}
+  `).get(...params);
+
+  const byService = db.prepare(`
+    SELECT s.name, s.prefix, s.color,
+      COUNT(t.id) as total,
+      COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed,
+      COUNT(CASE WHEN t.status = 'no_show'   THEN 1 END) as no_show,
+      ROUND(AVG(CASE WHEN t.called_at IS NOT NULL
+        THEN (julianday(t.called_at) - julianday(t.created_at)) * 1440 END), 1) as avg_wait
+    FROM tickets t JOIN services s ON t.service_id = s.id
+    WHERE ${w} GROUP BY t.service_id ORDER BY total DESC
+  `).all(...params);
+
+  const byOperator = db.prepare(`
+    SELECT COALESCE(o.name, 'Sin asignar') as operator_name,
+      COUNT(t.id) as total,
+      COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed,
+      COUNT(CASE WHEN t.status = 'no_show'   THEN 1 END) as no_show,
+      ROUND(AVG(CASE WHEN t.completed_at IS NOT NULL AND t.called_at IS NOT NULL
+        THEN (julianday(t.completed_at) - julianday(t.called_at)) * 1440 END), 1) as avg_service
+    FROM tickets t LEFT JOIN operators o ON t.serving_operator_id = o.id
+    WHERE ${w} GROUP BY t.serving_operator_id ORDER BY total DESC
+  `).all(...params);
+
+  const byHour = db.prepare(`
+    SELECT strftime('%H', t.created_at) as hour,
+      COUNT(*) as total,
+      COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed
+    FROM tickets t WHERE ${w} GROUP BY hour ORDER BY hour
+  `).all(...params);
+
+  const tickets = db.prepare(`
+    SELECT t.*, s.name as service_name, s.prefix, s.color,
+           c.number as counter_number, o.name as operator_name
+    FROM tickets t
+    JOIN services s ON t.service_id = s.id
+    LEFT JOIN counters c ON t.counter_id = c.id
+    LEFT JOIN operators o ON t.serving_operator_id = o.id
+    WHERE ${w} ORDER BY t.created_at DESC LIMIT 500
+  `).all(...params);
+
+  res.json({ summary, byService, byOperator, byHour, tickets });
 });
 
 // ─── ADS ─────────────────────────────────────────────────

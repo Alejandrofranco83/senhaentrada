@@ -28,6 +28,7 @@ function showSection(name) {
   if (name === 'queue') loadQueue();
   if (name === 'ads') loadAds();
   if (name === 'announcements') loadAnnouncements();
+  if (name === 'reports') loadReports();
 }
 
 // ─── STATS ───────────────────────────────────────────
@@ -225,11 +226,12 @@ function openServiceModal(id) {
   const s = id ? servicesCache.find(x => x.id === id) : null;
 
   document.getElementById('serviceModalTitle').textContent = s ? 'Editar Servicio' : 'Agregar Servicio';
-  document.getElementById('svcName').value = s?.name || '';
-  document.getElementById('svcNamePt').value = s?.name_pt || '';
-  document.getElementById('svcPrefix').value = s?.prefix || '';
-  document.getElementById('svcPriority').value = s?.priority || 1;
-  document.getElementById('svcActive').checked = s ? !!s.active : true;
+  document.getElementById('svcName').value        = s?.name        || '';
+  document.getElementById('svcNamePt').value      = s?.name_pt     || '';
+  document.getElementById('svcPrefix').value      = s?.prefix      || '';
+  document.getElementById('svcPriority').value    = s?.priority    || 1;
+  document.getElementById('svcDescription').value = s?.description || '';
+  document.getElementById('svcActive').checked    = s ? !!s.active : true;
 
   buildIconPicker(s?.icon || '');
   buildColorPicker(s?.color || '#2196F3');
@@ -247,12 +249,13 @@ function addService() {
 }
 
 async function saveService() {
-  const name = document.getElementById('svcName').value.trim();
-  const name_pt = document.getElementById('svcNamePt').value.trim();
-  const prefix = document.getElementById('svcPrefix').value.trim().toUpperCase();
-  const priority = parseInt(document.getElementById('svcPriority').value);
-  const active = document.getElementById('svcActive').checked ? 1 : 0;
-  const color = document.getElementById('svcColorCustom').value;
+  const name        = document.getElementById('svcName').value.trim();
+  const name_pt     = document.getElementById('svcNamePt').value.trim();
+  const prefix      = document.getElementById('svcPrefix').value.trim().toUpperCase();
+  const priority    = parseInt(document.getElementById('svcPriority').value);
+  const active      = document.getElementById('svcActive').checked ? 1 : 0;
+  const color       = document.getElementById('svcColorCustom').value;
+  const description = document.getElementById('svcDescription').value.trim() || null;
   const selectedIconEl = document.querySelector('#svcIconPicker .icon-option.selected');
   const icon = selectedIconEl ? selectedIconEl.dataset.icon : '';
 
@@ -267,6 +270,7 @@ async function saveService() {
     icon,
     color,
     priority,
+    description,
     is_specific: existing ? existing.is_specific : 0,
     sort_order: existing ? existing.sort_order : 10,
     active
@@ -303,6 +307,7 @@ function toggleServiceActive(id) {
       icon: s.icon || '',
       color: s.color,
       priority: s.priority,
+      description: s.description || null,
       is_specific: s.is_specific,
       sort_order: s.sort_order,
       active: newActive
@@ -715,6 +720,193 @@ async function deleteAnnouncement(id) {
   if (!a || !confirm(`¿Eliminar el aviso "${a.title}"?`)) return;
   await fetch(`/api/announcements/${id}`, { method: 'DELETE' });
   loadAnnouncements();
+}
+
+// ─── REPORTS ─────────────────────────────────────────
+let reportData = null;
+let reportFiltersReady = false;
+
+async function loadReports() {
+  if (!reportFiltersReady) {
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('rptFrom').value = today;
+    document.getElementById('rptTo').value   = today;
+
+    const [services, operators] = await Promise.all([
+      fetch('/api/services?all=true').then(r => r.json()),
+      fetch('/api/operators').then(r => r.json())
+    ]);
+
+    const svcSel = document.getElementById('rptService');
+    services.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = `${s.prefix} ${s.name}`;
+      svcSel.appendChild(o);
+    });
+
+    const opSel = document.getElementById('rptOperator');
+    operators.forEach(op => {
+      const o = document.createElement('option');
+      o.value = op.id; o.textContent = op.name;
+      opSel.appendChild(o);
+    });
+
+    reportFiltersReady = true;
+  }
+  runReport();
+}
+
+async function runReport() {
+  const from = document.getElementById('rptFrom').value;
+  const to   = document.getElementById('rptTo').value;
+  const svc  = document.getElementById('rptService').value;
+  const op   = document.getElementById('rptOperator').value;
+
+  if (!from || !to) { alert('Seleccioná un rango de fechas'); return; }
+
+  const p = new URLSearchParams({ date_from: from, date_to: to });
+  if (svc) p.set('service_id',  svc);
+  if (op)  p.set('operator_id', op);
+
+  const data = await fetch(`/api/reports?${p}`).then(r => r.json());
+  reportData = data;
+
+  renderRptSummary(data.summary);
+  renderRptByService(data.byService);
+  renderRptByOperator(data.byOperator);
+  renderRptByHour(data.byHour);
+  renderRptTickets(data.tickets);
+}
+
+function renderRptSummary(s) {
+  const noShow   = s.no_show   || 0;
+  const noShowPct = s.total > 0 ? Math.round(noShow / s.total * 100) : 0;
+  document.getElementById('rptSummary').innerHTML = `
+    <div class="stat-card">
+      <div class="value">${s.total}</div>
+      <div class="label">Total Turnos</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" style="color:var(--success)">${s.completed || 0}</div>
+      <div class="label">Atendidos</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" style="color:var(--warning)">${noShow} <small style="font-size:1.2rem;">(${noShowPct}%)</small></div>
+      <div class="label">No-show</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" style="color:var(--info)">${s.avg_wait ?? '—'} min</div>
+      <div class="label">Espera Promedio</div>
+    </div>
+  `;
+}
+
+function renderRptByService(rows) {
+  document.getElementById('rptByService').innerHTML = rows.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Sin datos</td></tr>'
+    : rows.map(r => `
+      <tr>
+        <td><span style="color:${r.color};font-weight:700;">${r.prefix}</span> ${r.name}</td>
+        <td>${r.total}</td>
+        <td style="color:var(--success)">${r.completed}</td>
+        <td style="color:var(--warning)">${r.no_show}</td>
+        <td>${r.avg_wait != null ? r.avg_wait + ' min' : '—'}</td>
+      </tr>`).join('');
+}
+
+function renderRptByOperator(rows) {
+  document.getElementById('rptByOperator').innerHTML = rows.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Sin datos</td></tr>'
+    : rows.map(r => `
+      <tr>
+        <td>${r.operator_name}</td>
+        <td>${r.total}</td>
+        <td style="color:var(--success)">${r.completed}</td>
+        <td style="color:var(--warning)">${r.no_show}</td>
+        <td>${r.avg_service != null ? r.avg_service + ' min' : '—'}</td>
+      </tr>`).join('');
+}
+
+function renderRptByHour(rows) {
+  const el = document.getElementById('rptByHour');
+  if (rows.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-muted);">Sin datos para el período.</p>';
+    return;
+  }
+  const maxVal = Math.max(...rows.map(r => r.total));
+  el.innerHTML = `<div style="display:grid;gap:7px;max-width:680px;">` +
+    rows.map(r => {
+      const pct = maxVal > 0 ? (r.total / maxVal * 100).toFixed(1) : 0;
+      return `
+        <div style="display:grid;grid-template-columns:3.8rem 1fr 2.8rem;align-items:center;gap:10px;">
+          <span style="font-size:0.82rem;color:var(--text-muted);text-align:right;">${r.hour}:00h</span>
+          <div style="background:var(--bg-surface);border-radius:4px;height:22px;overflow:hidden;">
+            <div style="background:var(--accent);height:100%;width:${pct}%;border-radius:4px;transition:width 0.5s ease;"></div>
+          </div>
+          <span style="font-size:0.85rem;font-weight:700;">${r.total}</span>
+        </div>`;
+    }).join('') + `</div>`;
+}
+
+const RPT_STATUS = {
+  completed: '✅ Atendido', no_show: '👻 No-show',
+  cancelled: '❌ Cancelado', waiting: '⏳ Esperando',
+  called: '📢 Llamado',     serving: '🔧 Atendiendo'
+};
+
+function renderRptTickets(tickets) {
+  document.getElementById('rptCount').textContent = `(${tickets.length} registros)`;
+  document.getElementById('rptTickets').innerHTML = tickets.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Sin turnos en el período.</td></tr>'
+    : tickets.map(t => {
+        const toMs  = s => s ? new Date(s.replace(' ', 'T')).getTime() : null;
+        const waitMin = (toMs(t.called_at) && toMs(t.created_at))
+          ? Math.round((toMs(t.called_at) - toMs(t.created_at)) / 60000) : null;
+        const durMin  = (toMs(t.completed_at) && toMs(t.called_at))
+          ? Math.round((toMs(t.completed_at) - toMs(t.called_at)) / 60000) : null;
+        const hhmm = s => s ? s.slice(11, 16) : '—';
+        return `
+          <tr>
+            <td style="font-weight:700;color:${t.color||'#fff'}">${t.code}</td>
+            <td>${t.service_name}</td>
+            <td>${RPT_STATUS[t.status] || t.status}</td>
+            <td>${t.counter_number ?? '—'}</td>
+            <td>${t.operator_name  ?? '—'}</td>
+            <td style="font-size:0.85rem;">${hhmm(t.created_at)}</td>
+            <td style="font-size:0.85rem;">${hhmm(t.called_at)}</td>
+            <td>${waitMin != null ? waitMin : '—'}</td>
+            <td>${durMin  != null ? durMin  : '—'}</td>
+          </tr>`;
+      }).join('');
+}
+
+function exportReportCSV() {
+  if (!reportData?.tickets?.length) { alert('Primero generá un reporte.'); return; }
+
+  const toMs  = s => s ? new Date(s.replace(' ', 'T')).getTime() : null;
+  const headers = ['Código','Servicio','Estado','Caja','Operador',
+                   'Entrada','Llamado','Completado','Espera(min)','Duración(min)'];
+  const rows = reportData.tickets.map(t => {
+    const waitMin = (toMs(t.called_at) && toMs(t.created_at))
+      ? Math.round((toMs(t.called_at) - toMs(t.created_at)) / 60000) : '';
+    const durMin  = (toMs(t.completed_at) && toMs(t.called_at))
+      ? Math.round((toMs(t.completed_at) - toMs(t.called_at)) / 60000) : '';
+    return [
+      t.code, t.service_name, t.status,
+      t.counter_number ?? '', t.operator_name ?? '',
+      t.created_at ?? '', t.called_at ?? '', t.completed_at ?? '',
+      waitMin, durMin
+    ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+  });
+
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `reporte_${document.getElementById('rptFrom').value}_al_${document.getElementById('rptTo').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── SOCKET EVENTS ───────────────────────────────────

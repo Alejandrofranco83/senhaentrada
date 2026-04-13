@@ -24,6 +24,7 @@ async function init() {
       <span class="icon">${svc.icon || ''}</span>
       <span class="label-es">${svc.name}</span>
       <span class="label-pt">${svc.name_pt || ''}</span>
+      ${svc.description ? `<span class="label-desc">${svc.description}</span>` : ''}
     `;
 
     if (svc.is_specific) {

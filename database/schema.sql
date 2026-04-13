@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS services (
     priority INTEGER DEFAULT 1,
     is_specific INTEGER DEFAULT 0,
     active INTEGER DEFAULT 1,
-    sort_order INTEGER DEFAULT 0
+    sort_order INTEGER DEFAULT 0,
+    description TEXT
 );
 
 -- Operadores/atendientes
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     called_at DATETIME,
     serving_at DATETIME,
     completed_at DATETIME,
+    serving_operator_id INTEGER,
     FOREIGN KEY (service_id) REFERENCES services(id),
     FOREIGN KEY (counter_id) REFERENCES counters(id),
     FOREIGN KEY (requested_operator_id) REFERENCES operators(id)

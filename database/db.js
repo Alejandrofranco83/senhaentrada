@@ -59,6 +59,18 @@ try {
 }
 
 try {
+  db.prepare("SELECT serving_operator_id FROM tickets LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE tickets ADD COLUMN serving_operator_id INTEGER").run();
+}
+
+try {
+  db.prepare("SELECT description FROM services LIMIT 1").get();
+} catch (e) {
+  db.prepare("ALTER TABLE services ADD COLUMN description TEXT").run();
+}
+
+try {
   db.prepare("SELECT schedule_type FROM announcements LIMIT 1").get();
 } catch (e) {
   db.prepare("ALTER TABLE announcements ADD COLUMN schedule_type TEXT DEFAULT 'manual'").run();
