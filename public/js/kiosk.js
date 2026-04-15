@@ -98,19 +98,24 @@ async function showOperatorScreen() {
   firstBtn.onclick = () => createTicket(specificServiceId, null);
   list.appendChild(firstBtn);
 
-  // Calculate grid: adjust columns/rows to fill screen
+  // Calculate grid: prefer 2 rows to keep photos from getting too narrow
   const total = operators.length + 1; // +1 for "first available"
-  let cols;
-  if (total <= 2) cols = 2;
-  else if (total <= 3) cols = 3;
-  else if (total <= 4) cols = 2;
-  else if (total <= 6) cols = 3;
-  else if (total <= 8) cols = 4;
-  else cols = Math.ceil(Math.sqrt(total));
+  let cols, rows;
+  if (total <= 2) { cols = total; rows = 1; }
+  else if (total <= 4) { cols = 2; rows = 2; }
+  else if (total <= 6) { cols = 3; rows = 2; }
+  else if (total <= 8) { cols = 4; rows = 2; }
+  else if (total <= 10) { cols = 5; rows = 2; }
+  else { cols = Math.ceil(total / 3); rows = 3; }
 
-  const rows = Math.ceil(total / cols);
   list.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   list.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+  // When total is odd and fills 2 rows with one slot empty, make the
+  // "first available" button span 2 columns so the layout looks balanced.
+  if (total === 3) {
+    firstBtn.style.gridColumn = 'span 2';
+  }
 
   document.getElementById('serviceScreen').style.display = 'none';
   document.getElementById('operatorScreen').classList.add('active');
