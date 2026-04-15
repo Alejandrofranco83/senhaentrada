@@ -179,25 +179,26 @@ function showAd(index) {
 }
 
 // ─── AUDIO ACTIVATION ────────────────────────────────
-let audioActivated        = false;
+// All TTS is now generated server-side as MP3 (msedge-tts) and played via <audio>.
+// This works on Smart TV browsers (Tizen/webOS/Android TV) that don't support
+// the Web Speech API.
+
+let audioActivated           = false;
 let currentAnnouncementAudio = null;   // tracks playing scheduled/manual audio
-let isAnnouncingTicket    = false;     // true while ticket TTS is speaking
-let esVoice = null;
-let ptVoice = null;
+let currentTicketAudio       = null;   // tracks playing ticket-call audio
+let isAnnouncingTicket       = false;  // true while ticket TTS is playing
 
 function activateAudio() {
   audioActivated = true;
   document.getElementById('audioOverlay').style.display = 'none';
-  const unlock = new SpeechSynthesisUtterance('');
+  // Unlock autoplay: play a 1-frame silent audio while we have a user gesture
+  const unlock = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA//tQwAADQAAB');
   unlock.volume = 0;
-  speechSynthesis.speak(unlock);
-  findVoices();
-  speechSynthesis.onvoiceschanged = findVoices;
+  unlock.play().catch(() => {});
 }
 
-// Stop any currently playing announcement (ticket has priority)
+// Stop any currently playing audio (ticket has priority over announcements)
 function stopCurrentAnnouncement() {
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
   if (currentAnnouncementAudio) {
     currentAnnouncementAudio.pause();
     currentAnnouncementAudio.currentTime = 0;
@@ -205,48 +206,64 @@ function stopCurrentAnnouncement() {
   }
 }
 
-function findVoices() {
-  const voices = speechSynthesis.getVoices();
-  if (voices.length === 0) return;
-  const esPreferred = ['es-MX', 'es-AR', 'es-US', 'es-CO', 'es-CL', 'es-419'];
-  for (const lang of esPreferred) {
-    const v = voices.find(v => v.lang === lang);
-    if (v) { esVoice = v; break; }
+function stopCurrentTicket() {
+  if (currentTicketAudio) {
+    currentTicketAudio.pause();
+    currentTicketAudio.currentTime = 0;
+    currentTicketAudio = null;
   }
-  if (!esVoice) esVoice = voices.find(v => v.lang.startsWith('es')) || null;
-  ptVoice = voices.find(v => v.lang === 'pt-BR')
-    || voices.find(v => v.lang.startsWith('pt'))
-    || null;
+  isAnnouncingTicket = false;
 }
 
-// ─── TTS ─────────────────────────────────────────────
-function announceTicket(ticket) {
-  if (!audioActivated || !('speechSynthesis' in window)) return;
-  stopCurrentAnnouncement();    // ticket interrupts any running announcement
+// Play an MP3 from a URL; returns a promise resolved on `ended`
+function playAudioUrl(url) {
+  return new Promise((resolve, reject) => {
+    const a = new Audio(url);
+    a.onended = () => resolve(a);
+    a.onerror = () => reject(new Error('audio error'));
+    a.play().then(() => { /* started */ }, reject);
+  });
+}
+
+// ─── TICKET CALL TTS ─────────────────────────────────
+async function announceTicket(ticket) {
+  if (!audioActivated) return;
+  stopCurrentAnnouncement();   // ticket preempts any running announcement
+  stopCurrentTicket();          // and any in-flight ticket call
   isAnnouncingTicket = true;
 
-  const code    = ticket.code;
-  const esNames = {'0':'cero','1':'uno','2':'dos','3':'tres','4':'cuatro','5':'cinco','6':'seis','7':'siete','8':'ocho','9':'nueve'};
-  const ptNames = {'0':'zero','1':'um','2':'dois','3':'três','4':'quatro','5':'cinco','6':'seis','7':'sete','8':'oito','9':'nove'};
-  const spokenEs = code.split('').map(c => esNames[c] || c).join(' ');
-  const spokenPt = code.split('').map(c => ptNames[c] || c).join(' ');
-  const cn = ticket.counter_number || '';
+  const code = ticket.code;
+  const cn   = ticket.counter_number || '';
 
-  const ptU = new SpeechSynthesisUtterance(`Senha ${spokenPt}, dirija-se ao Caixa ${cn}`);
-  if (ptVoice) ptU.voice = ptVoice;
-  ptU.lang = ptVoice ? ptVoice.lang : 'pt-BR';
-  ptU.rate = 0.85; ptU.volume = 1;
+  const urlPt = `/api/tts/ticket?code=${encodeURIComponent(code)}&counter=${encodeURIComponent(cn)}&lang=pt`;
+  const urlEs = `/api/tts/ticket?code=${encodeURIComponent(code)}&counter=${encodeURIComponent(cn)}&lang=es`;
 
-  const esU = new SpeechSynthesisUtterance(`Turno ${spokenEs}, diríjase a Caja ${cn}`);
-  if (esVoice) esU.voice = esVoice;
-  esU.lang = esVoice ? esVoice.lang : 'es-MX';
-  esU.rate = 0.85; esU.volume = 1;
+  try {
+    const ptAudio = new Audio(urlPt);
+    currentTicketAudio = ptAudio;
+    await new Promise((resolve) => {
+      ptAudio.onended = resolve;
+      ptAudio.onerror = resolve;
+      ptAudio.play().catch(resolve);
+    });
 
-  esU.onend   = () => { isAnnouncingTicket = false; };
-  esU.onerror = () => { isAnnouncingTicket = false; };
-  ptU.onerror = () => { isAnnouncingTicket = false; };
-  ptU.onend = () => setTimeout(() => speechSynthesis.speak(esU), 500);
-  speechSynthesis.speak(ptU);
+    if (currentTicketAudio !== ptAudio) return;  // was interrupted
+
+    await new Promise(r => setTimeout(r, 500));
+
+    const esAudio = new Audio(urlEs);
+    currentTicketAudio = esAudio;
+    await new Promise((resolve) => {
+      esAudio.onended = resolve;
+      esAudio.onerror = resolve;
+      esAudio.play().catch(resolve);
+    });
+  } finally {
+    if (currentTicketAudio && currentTicketAudio.src.includes('/api/tts/ticket')) {
+      currentTicketAudio = null;
+    }
+    isAnnouncingTicket = false;
+  }
 }
 
 // ─── SOCKET EVENTS ───────────────────────────────────
@@ -286,43 +303,44 @@ socket.on('tickets:active', (active) => {
   renderCalled();
 });
 
-socket.on('announcement:play', (data) => {
+async function playAnnouncement(data) {
+  stopCurrentAnnouncement();
+
   if (data.type === 'audio') {
-    stopCurrentAnnouncement();
     const audio = new Audio(`/audio/announcements/${data.filename}`);
     currentAnnouncementAudio = audio;
-    audio.play().catch(() => {});
     audio.onended = () => { if (currentAnnouncementAudio === audio) currentAnnouncementAudio = null; };
+    audio.play().catch(() => {});
     return;
   }
 
-  // TTS announcement
-  if (!('speechSynthesis' in window)) return;
-  stopCurrentAnnouncement();
-
+  // TTS announcement → server-generated MP3
   const text = data.content || '';
+  if (!text) return;
   const lang = data.lang || 'both';
+  const langs = lang === 'both' ? ['pt', 'es'] : [lang];
 
-  const ptU = new SpeechSynthesisUtterance(text);
-  if (ptVoice) ptU.voice = ptVoice;
-  ptU.lang = ptVoice ? ptVoice.lang : 'pt-BR';
-  ptU.rate = 0.85; ptU.volume = 1;
-
-  const esU = new SpeechSynthesisUtterance(text);
-  if (esVoice) esU.voice = esVoice;
-  esU.lang = esVoice ? esVoice.lang : 'es-MX';
-  esU.rate = 0.85; esU.volume = 1;
-
-  if (lang === 'pt') {
-    speechSynthesis.speak(ptU);
-  } else if (lang === 'es') {
-    speechSynthesis.speak(esU);
-  } else {
-    // both: PT first, then ES
-    ptU.onend = () => setTimeout(() => speechSynthesis.speak(esU), 600);
-    speechSynthesis.speak(ptU);
+  for (const l of langs) {
+    if (isAnnouncingTicket) return;  // ticket preempts
+    const url = `/api/tts/text?lang=${l}&text=${encodeURIComponent(text)}`;
+    const audio = new Audio(url);
+    currentAnnouncementAudio = audio;
+    try {
+      await new Promise((resolve) => {
+        audio.onended = resolve;
+        audio.onerror = resolve;
+        audio.play().catch(resolve);
+      });
+    } catch (e) {}
+    if (currentAnnouncementAudio !== audio) return;  // interrupted
+    if (langs.length > 1 && l !== langs[langs.length - 1]) {
+      await new Promise(r => setTimeout(r, 600));
+    }
   }
-});
+  currentAnnouncementAudio = null;
+}
+
+socket.on('announcement:play', (data) => playAnnouncement(data));
 
 // ─── ANNOUNCEMENT SCHEDULER ──────────────────────────
 const scheduledLastPlayed = {};  // annId → ms timestamp
@@ -370,38 +388,8 @@ async function checkScheduledAnnouncements() {
 function playScheduledAnnouncement(ann) {
   // Ticket has priority — don't play if ticket TTS is active
   if (isAnnouncingTicket) return;
-  if ('speechSynthesis' in window && speechSynthesis.speaking) return;
-
-  if (ann.type === 'audio') {
-    const audio = new Audio(`/audio/announcements/${ann.filename}`);
-    currentAnnouncementAudio = audio;
-    audio.play().catch(() => {});
-    audio.onended = () => { if (currentAnnouncementAudio === audio) currentAnnouncementAudio = null; };
-    return;
-  }
-
-  if (!('speechSynthesis' in window)) return;
-  const text = ann.content || '';
-  const lang = ann.lang || 'both';
-
-  const ptU = new SpeechSynthesisUtterance(text);
-  if (ptVoice) ptU.voice = ptVoice;
-  ptU.lang = ptVoice ? ptVoice.lang : 'pt-BR';
-  ptU.rate = 0.85; ptU.volume = 1;
-
-  const esU = new SpeechSynthesisUtterance(text);
-  if (esVoice) esU.voice = esVoice;
-  esU.lang = esVoice ? esVoice.lang : 'es-MX';
-  esU.rate = 0.85; esU.volume = 1;
-
-  if (lang === 'pt') {
-    speechSynthesis.speak(ptU);
-  } else if (lang === 'es') {
-    speechSynthesis.speak(esU);
-  } else {
-    ptU.onend = () => setTimeout(() => speechSynthesis.speak(esU), 600);
-    speechSynthesis.speak(ptU);
-  }
+  if (currentAnnouncementAudio) return;
+  playAnnouncement(ann);
 }
 
 // ─── START ───────────────────────────────────────────

@@ -6,6 +6,7 @@ const multer = require('multer');
 const { db } = require('../database/db');
 const queue = require('../services/queue');
 const { printTicket } = require('../services/printer');
+const tts = require('../services/tts');
 
 // Multer config for announcement audio uploads
 const audioStorage = multer.diskStorage({
@@ -232,6 +233,14 @@ router.post('/tickets', async (req, res) => {
     // Print ticket
     await printTicket(ticket);
 
+    // Pre-generate TTS MP3s for every open counter so by call-time they're cached
+    const openCounters = db.prepare(
+      "SELECT number FROM counters WHERE status != 'closed'"
+    ).all();
+    for (const c of openCounters) {
+      tts.preGenerateTicket(ticket.code, c.number);
+    }
+
     if (socketEmitter) socketEmitter.emitTicketCreated(ticket);
     res.json(ticket);
   } catch (err) {
@@ -347,6 +356,15 @@ router.post('/announcements/upload-audio', audioUpload.single('audio'), (req, re
   res.json({ ok: true, filename: req.file.filename, url: `/audio/announcements/${req.file.filename}` });
 });
 
+function preGenAnnouncementTts(content, lang) {
+  if (!content) return;
+  const langs = lang === 'both' ? ['pt', 'es'] : [lang];
+  for (const l of langs) {
+    tts.getTextAudio(content, l).catch((e) =>
+      console.error(`[tts] announcement pre-gen failed:`, e.message));
+  }
+}
+
 router.post('/announcements', (req, res) => {
   const { title, type, content, filename, lang, schedule_type, schedule_interval, schedule_time } = req.body;
   if (!title || !type) return res.status(400).json({ error: 'title y type son requeridos' });
@@ -354,6 +372,7 @@ router.post('/announcements', (req, res) => {
     'INSERT INTO announcements (title, type, content, filename, lang, schedule_type, schedule_interval, schedule_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(title, type, content || null, filename || null, lang || 'both',
         schedule_type || 'manual', schedule_interval || null, schedule_time || null);
+  if (type === 'tts') preGenAnnouncementTts(content, lang || 'both');
   res.json(db.prepare('SELECT * FROM announcements WHERE id = ?').get(result.lastInsertRowid));
 });
 
@@ -363,7 +382,9 @@ router.put('/announcements/:id', (req, res) => {
     .run(title, content, lang, active,
          schedule_type || 'manual', schedule_interval || null, schedule_time || null,
          req.params.id);
-  res.json(db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id));
+  const ann = db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id);
+  if (ann && ann.type === 'tts') preGenAnnouncementTts(ann.content, ann.lang);
+  res.json(ann);
 });
 
 router.delete('/announcements/:id', (req, res) => {
@@ -505,6 +526,73 @@ router.delete('/ads/:id', (req, res) => {
 
   db.prepare('DELETE FROM media_ads WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+// ─── TTS ─────────────────────────────────────────────────
+function sendTtsFile(res, filePath) {
+  res.set('Content-Type', 'audio/mpeg');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.sendFile(filePath);
+}
+
+router.get('/tts/ticket', async (req, res) => {
+  const { code, counter, lang } = req.query;
+  if (!code || !counter || !['pt', 'es'].includes(lang)) {
+    return res.status(400).json({ error: 'code, counter, lang (pt|es) requeridos' });
+  }
+  try {
+    const file = await tts.getTicketAudio(code, counter, lang);
+    sendTtsFile(res, file);
+  } catch (e) {
+    res.status(503).json({ error: 'TTS no disponible: ' + e.message });
+  }
+});
+
+router.get('/tts/text', async (req, res) => {
+  const { text, lang } = req.query;
+  if (!text || !['pt', 'es'].includes(lang)) {
+    return res.status(400).json({ error: 'text y lang (pt|es) requeridos' });
+  }
+  try {
+    const file = await tts.getTextAudio(text, lang);
+    sendTtsFile(res, file);
+  } catch (e) {
+    res.status(503).json({ error: 'TTS no disponible: ' + e.message });
+  }
+});
+
+router.get('/tts/preview', async (req, res) => {
+  const { voice, text } = req.query;
+  if (!voice) return res.status(400).json({ error: 'voice requerido' });
+  const sample = text || (voice.startsWith('pt-')
+    ? 'Senha um dois três, dirija-se ao Caixa um'
+    : 'Turno uno dos tres, diríjase a Caja uno');
+  try {
+    const file = await tts.synthesize(sample, voice);
+    sendTtsFile(res, file);
+  } catch (e) {
+    res.status(503).json({ error: 'TTS no disponible: ' + e.message });
+  }
+});
+
+router.get('/tts/voices', async (req, res) => {
+  res.json(await tts.listVoices());
+});
+
+router.get('/tts/config', (req, res) => {
+  res.json(tts.loadConfig());
+});
+
+router.post('/tts/config', (req, res) => {
+  const { ptVoice, esVoice, rate, clearCache } = req.body || {};
+  const cfg = tts.saveConfig({ ptVoice, esVoice, rate });
+  let cleared = 0;
+  if (clearCache) cleared = tts.clearCache();
+  res.json({ ...cfg, cleared });
+});
+
+router.post('/tts/clear-cache', (req, res) => {
+  res.json({ cleared: tts.clearCache() });
 });
 
 // ─── HELPERS ─────────────────────────────────────────────

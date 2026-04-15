@@ -28,6 +28,7 @@ function showSection(name) {
   if (name === 'queue') loadQueue();
   if (name === 'ads') loadAds();
   if (name === 'announcements') loadAnnouncements();
+  if (name === 'voices') loadVoiceConfig();
   if (name === 'reports') loadReports();
 }
 
@@ -907,6 +908,64 @@ function exportReportCSV() {
   a.download = `reporte_${document.getElementById('rptFrom').value}_al_${document.getElementById('rptTo').value}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─── VOICES (TTS) ────────────────────────────────────
+let voicesList = null;
+
+async function loadVoiceConfig() {
+  const statusEl = document.getElementById('voiceStatus');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Cargando voces...'; }
+
+  try {
+    if (!voicesList) voicesList = await fetch('/api/tts/voices').then(r => r.json());
+    const cfg = await fetch('/api/tts/config').then(r => r.json());
+
+    fillVoiceSelect('voicePtSelect', voicesList.filter(v => v.locale.startsWith('pt-BR')), cfg.ptVoice);
+    fillVoiceSelect('voiceEsSelect', voicesList.filter(v => v.locale.startsWith('es-')),    cfg.esVoice);
+    document.getElementById('voiceRate').value = cfg.rate || '-15%';
+
+    if (statusEl) statusEl.style.display = 'none';
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '⚠ Error al cargar voces. ¿Hay internet en el servidor?';
+  }
+}
+
+function fillVoiceSelect(id, voices, selected) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = voices.map(v =>
+    `<option value="${v.shortName}" ${v.shortName === selected ? 'selected' : ''}>${v.locale} — ${v.gender} — ${v.shortName.replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '')}</option>`
+  ).join('');
+}
+
+function previewVoice(lang) {
+  const sel   = document.getElementById(lang === 'pt' ? 'voicePtSelect' : 'voiceEsSelect');
+  const voice = sel.value;
+  const audio = document.getElementById('voicePreviewAudio');
+  audio.src = `/api/tts/preview?voice=${encodeURIComponent(voice)}&t=${Date.now()}`;
+  audio.play().catch((e) => alert('No se pudo reproducir: ' + e.message));
+}
+
+async function saveVoiceConfig(clearCache) {
+  const ptVoice = document.getElementById('voicePtSelect').value;
+  const esVoice = document.getElementById('voiceEsSelect').value;
+  const rate    = document.getElementById('voiceRate').value;
+  const statusEl = document.getElementById('voiceStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Guardando...';
+
+  try {
+    const r = await fetch('/api/tts/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ptVoice, esVoice, rate, clearCache })
+    }).then(r => r.json());
+    statusEl.textContent = clearCache
+      ? `✓ Guardado. Cache limpiado: ${r.cleared} archivos eliminados.`
+      : '✓ Guardado.';
+  } catch (e) {
+    statusEl.textContent = '⚠ Error: ' + e.message;
+  }
 }
 
 // ─── SOCKET EVENTS ───────────────────────────────────
