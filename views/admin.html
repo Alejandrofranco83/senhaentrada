@@ -39,6 +39,10 @@
     <!-- Stats Section -->
     <div class="admin-section active" id="section-stats">
       <div class="grid-2 mb-2" id="statCards"></div>
+      <div id="staleTicketsBanner" style="display:none;margin-bottom:1rem;padding:0.75rem 1rem;background:var(--warning);color:#000;border-radius:8px;font-size:0.9rem;">
+        <span id="staleTicketsMsg"></span>
+        <button class="btn btn-secondary" style="margin-left:1rem;font-size:0.8rem;padding:0.3rem 0.8rem;" onclick="runCleanup()">Limpiar ahora</button>
+      </div>
       <div class="card mt-2">
         <h3 class="mb-2">Por Servicio / Por Serviço</h3>
         <table>

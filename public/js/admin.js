@@ -67,6 +67,35 @@ async function loadStats() {
       <td>${s.avg_wait ? Math.round(s.avg_wait) + ' min' : '-'}</td>
     </tr>
   `).join('');
+
+  checkStaleTickets();
+}
+
+async function checkStaleTickets() {
+  try {
+    const tickets = await fetch('/api/tickets/active').then(r => r.json());
+    const today = new Date().toISOString().slice(0, 10);
+    const stale = tickets.filter(t => t.created_at && t.created_at.slice(0, 10) < today);
+    const banner = document.getElementById('staleTicketsBanner');
+    if (stale.length > 0) {
+      document.getElementById('staleTicketsMsg').textContent =
+        `Hay ${stale.length} turno(s) de dias anteriores sin cerrar.`;
+      banner.style.display = 'flex';
+      banner.style.alignItems = 'center';
+    } else {
+      banner.style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+async function runCleanup() {
+  try {
+    const r = await fetch('/api/cleanup/run', { method: 'POST' }).then(r => r.json());
+    alert(`Limpieza completa: ${r.cancelled} cancelados, ${r.noShow} marcados no-show.`);
+    loadStats();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
 }
 
 // ─── COUNTERS ────────────────────────────────────────

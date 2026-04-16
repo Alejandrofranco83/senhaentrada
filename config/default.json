@@ -16,5 +16,8 @@
   },
   "kiosk": {
     "resetTimeout": 5000
+  },
+  "cleanup": {
+    "hour": 0
   }
 }

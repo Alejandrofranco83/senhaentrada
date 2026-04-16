@@ -185,6 +185,19 @@ router.post('/counters/:id/open', (req, res) => {
 });
 
 router.post('/counters/:id/close', (req, res) => {
+  const counter = db.prepare('SELECT * FROM counters WHERE id = ?').get(req.params.id);
+
+  // Complete any active ticket on this counter
+  if (counter && counter.current_ticket_id) {
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    db.prepare("UPDATE tickets SET status = 'completed', completed_at = ? WHERE id = ? AND status IN ('called','serving')")
+      .run(now, counter.current_ticket_id);
+    if (socketEmitter) {
+      const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(counter.current_ticket_id);
+      if (ticket) socketEmitter.emitTicketCompleted(ticket);
+    }
+  }
+
   db.prepare('UPDATE counters SET status = ?, operator_id = NULL, current_ticket_id = NULL WHERE id = ?')
     .run('closed', req.params.id);
 
@@ -598,6 +611,14 @@ router.post('/tts/config', (req, res) => {
 
 router.post('/tts/clear-cache', (req, res) => {
   res.json({ cleared: tts.clearCache() });
+});
+
+// ─── CLEANUP ─────────────────────────────────────────────
+const cleanup = require('../services/cleanup');
+
+router.post('/cleanup/run', (req, res) => {
+  const result = cleanup.runDailyCleanup();
+  res.json({ ok: true, ...result });
 });
 
 // ─── HELPERS ─────────────────────────────────────────────

@@ -7,6 +7,7 @@ const { seedDefaults } = require('./database/db');
 const { setupSocket } = require('./services/socket');
 const apiRoutes = require('./routes/api');
 const pageRoutes = require('./routes/pages');
+const cleanup = require('./services/cleanup');
 
 // Initialize
 const app = express();
@@ -49,6 +50,11 @@ app.use('/', pageRoutes);
 
 // Seed default data
 seedDefaults(config);
+
+// Daily cleanup scheduler — clears stale tickets at configured hour
+cleanup.setSocketEmitter(socketEmitter);
+cleanup.setCleanupHour(config.cleanup?.hour ?? 0);  // default: midnight
+cleanup.startScheduler();
 
 // Start server
 const PORT = config.port || 3000;
