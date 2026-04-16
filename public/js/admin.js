@@ -927,15 +927,20 @@ async function loadVoiceConfig() {
 
     // Backend info
     const infoEl = document.getElementById('voiceBackendInfo');
+    const piperOk  = status.piperAvailable;
     const espeakOk = status.espeakAvailable;
-    infoEl.innerHTML = espeakOk
-      ? '<span style="color:var(--success);">&#10003;</span> espeak-ng disponible como fallback offline'
-      : '<span style="color:var(--warning);">&#9888;</span> espeak-ng no instalado. Para fallback offline: <code>sudo dnf install espeak-ng</code>';
-
-    const msedgeVoices = voicesList.filter(v => v.backend === 'msedge');
-    if (msedgeVoices.length === 0) {
-      infoEl.innerHTML += '<br><span style="color:var(--warning);">&#9888;</span> Voces Microsoft Edge no disponibles (sin internet o bloqueado)';
-    }
+    const msedgeOk = voicesList.some(v => v.backend === 'msedge');
+    let info = '';
+    info += msedgeOk
+      ? '<span style="color:var(--success);">&#10003;</span> Microsoft Edge Neural: disponible<br>'
+      : '<span style="color:var(--text-muted);">&#10007;</span> Microsoft Edge Neural: no disponible (sin internet o bloqueado)<br>';
+    info += piperOk
+      ? `<span style="color:var(--success);">&#10003;</span> Piper Neural (offline): disponible — modelos: ${status.piperModels.join(', ')}<br>`
+      : '<span style="color:var(--warning);">&#9888;</span> Piper Neural (offline): no instalado — <code>bash scripts/setup-piper.sh</code><br>';
+    info += espeakOk
+      ? '<span style="color:var(--success);">&#10003;</span> espeak-ng (offline): disponible'
+      : '<span style="color:var(--text-muted);">&#10007;</span> espeak-ng (offline): no instalado — <code>sudo dnf install espeak-ng</code>';
+    infoEl.innerHTML = info;
 
     document.getElementById('voiceBackend').value = cfg.backend || 'auto';
 

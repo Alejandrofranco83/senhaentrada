@@ -6,23 +6,25 @@ const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 
 const CACHE_DIR   = path.join(__dirname, '..', 'data', 'tts-cache');
 const CONFIG_FILE = path.join(__dirname, '..', 'data', 'tts-config.json');
-
-// espeak-ng voice mappings
-const ESPEAK_VOICES = { pt: 'pt-br', es: 'es-mx' };
+const PIPER_DIR   = path.join(__dirname, '..', 'data', 'piper');
+const PIPER_BIN   = path.join(PIPER_DIR, 'piper');
+const PIPER_MODELS = path.join(PIPER_DIR, 'models');
 
 const DEFAULT_CONFIG = {
-  backend: 'auto',  // 'auto' | 'msedge' | 'espeak'
+  backend: 'auto',  // 'auto' | 'msedge' | 'piper' | 'espeak'
   ptVoice: 'pt-BR-FranciscaNeural',
   esVoice: 'es-MX-DaliaNeural',
+  piperPtModel: 'pt_BR-faber-medium',
+  piperEsModel: 'es_MX-ald-medium',
   espeakPtVoice: 'pt-br',
   espeakEsVoice: 'es-mx',
   rate: '-15%',
-  espeakSpeed: 130   // words per minute (default ~175, lower = slower)
+  espeakSpeed: 130
 };
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
 
-// Detect espeak-ng availability
+// ─── BACKEND DETECTION ───────────────────────────────────
 let espeakAvailable = null;
 function hasEspeak() {
   if (espeakAvailable !== null) return espeakAvailable;
@@ -35,6 +37,25 @@ function hasEspeak() {
   return espeakAvailable;
 }
 
+let piperAvailable = null;
+function hasPiper() {
+  if (piperAvailable !== null) return piperAvailable;
+  if (!fs.existsSync(PIPER_BIN)) { piperAvailable = false; return false; }
+  // Check at least one model exists
+  if (!fs.existsSync(PIPER_MODELS)) { piperAvailable = false; return false; }
+  const models = fs.readdirSync(PIPER_MODELS).filter(f => f.endsWith('.onnx'));
+  piperAvailable = models.length > 0;
+  return piperAvailable;
+}
+
+function getPiperModels() {
+  if (!fs.existsSync(PIPER_MODELS)) return [];
+  return fs.readdirSync(PIPER_MODELS)
+    .filter(f => f.endsWith('.onnx'))
+    .map(f => f.replace('.onnx', ''));
+}
+
+// ─── CONFIG ──────────────────────────────────────────────
 function loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -50,17 +71,17 @@ function saveConfig(cfg) {
   return merged;
 }
 
+// ─── CACHE ───────────────────────────────────────────────
 function cacheKey(voice, text) {
   return crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex');
 }
 
-// Returns path with .mp3 or .wav depending on what exists
 function findCachedFile(voice, text) {
   const hash = cacheKey(voice, text);
-  const mp3 = path.join(CACHE_DIR, `${hash}.mp3`);
-  if (fs.existsSync(mp3)) return mp3;
-  const wav = path.join(CACHE_DIR, `${hash}.wav`);
-  if (fs.existsSync(wav)) return wav;
+  for (const ext of ['.mp3', '.wav']) {
+    const p = path.join(CACHE_DIR, `${hash}${ext}`);
+    if (fs.existsSync(p)) return p;
+  }
   return null;
 }
 
@@ -82,9 +103,7 @@ function synthesize(text, voice, opts = {}) {
 
 function pickBackend() {
   const cfg = loadConfig();
-  if (cfg.backend === 'msedge') return 'msedge';
-  if (cfg.backend === 'espeak') return 'espeak';
-  // 'auto': try msedge, fallback to espeak
+  if (cfg.backend !== 'auto') return cfg.backend;
   return 'auto';
 }
 
@@ -92,22 +111,34 @@ async function doSynthesize(text, voice, opts) {
   const hash = cacheKey(voice, text);
   const backend = pickBackend();
 
-  if (backend === 'msedge' || backend === 'auto') {
+  // Explicit backend
+  if (backend === 'msedge') return doSynthesizeMsEdge(text, voice, hash, opts);
+  if (backend === 'piper')  return doSynthesizePiper(text, voice, hash, opts);
+  if (backend === 'espeak') return doSynthesizeEspeak(text, voice, hash, opts);
+
+  // Auto: try msedge → piper → espeak
+  try {
+    return await doSynthesizeMsEdge(text, voice, hash, opts);
+  } catch (e) {
+    console.log(`[tts] msedge failed (${e.message}), trying piper...`);
+  }
+
+  if (hasPiper()) {
     try {
-      return await doSynthesizeMsEdge(text, voice, hash, opts);
+      return await doSynthesizePiper(text, voice, hash, opts);
     } catch (e) {
-      if (backend === 'msedge') throw e;
-      console.log(`[tts] msedge failed (${e.message}), falling back to espeak-ng`);
+      console.log(`[tts] piper failed (${e.message}), trying espeak-ng...`);
     }
   }
 
-  // espeak-ng fallback
-  if (!hasEspeak()) {
-    throw new Error('TTS no disponible: msedge falló y espeak-ng no está instalado. Instalar: sudo dnf install espeak-ng');
+  if (hasEspeak()) {
+    return doSynthesizeEspeak(text, voice, hash, opts);
   }
-  return doSynthesizeEspeak(text, voice, hash, opts);
+
+  throw new Error('TTS no disponible: ningún backend funciona. Instalar piper (bash scripts/setup-piper.sh) o espeak-ng (sudo dnf install espeak-ng)');
 }
 
+// ─── MSEDGE BACKEND ──────────────────────────────────────
 async function doSynthesizeMsEdge(text, voice, hash, opts) {
   const outFile = path.join(CACHE_DIR, `${hash}.mp3`);
   const tts = new MsEdgeTTS();
@@ -132,11 +163,47 @@ async function doSynthesizeMsEdge(text, voice, hash, opts) {
   }
 }
 
-function doSynthesizeEspeak(text, voice, hash, opts) {
+// ─── PIPER BACKEND ───────────────────────────────────────
+function doSynthesizePiper(text, voice, hash, opts) {
+  if (!hasPiper()) throw new Error('Piper no instalado. Ejecutar: bash scripts/setup-piper.sh');
+
   const outFile = path.join(CACHE_DIR, `${hash}.wav`);
   const cfg = loadConfig();
 
-  // Map msedge voice names to espeak voices
+  // Resolve model: use configured model, or pick by language from voice name
+  let modelName;
+  if (voice.startsWith('pt')) modelName = cfg.piperPtModel || 'pt_BR-faber-medium';
+  else modelName = cfg.piperEsModel || 'es_MX-ald-medium';
+
+  const modelPath = path.join(PIPER_MODELS, `${modelName}.onnx`);
+  if (!fs.existsSync(modelPath)) {
+    throw new Error(`Piper model not found: ${modelName}.onnx`);
+  }
+
+  return new Promise((resolve, reject) => {
+    const proc = execFile(PIPER_BIN, [
+      '--model', modelPath,
+      '--output_file', outFile
+    ], { timeout: 15000, env: { ...process.env, LD_LIBRARY_PATH: PIPER_DIR } }, (err) => {
+      if (err) return reject(new Error('piper failed: ' + err.message));
+      if (!fs.existsSync(outFile) || fs.statSync(outFile).size === 0) {
+        return reject(new Error('piper produced no audio'));
+      }
+      resolve(outFile);
+    });
+
+    proc.stdin.write(text);
+    proc.stdin.end();
+  });
+}
+
+// ─── ESPEAK BACKEND ──────────────────────────────────────
+function doSynthesizeEspeak(text, voice, hash, opts) {
+  if (!hasEspeak()) throw new Error('espeak-ng no instalado. Ejecutar: sudo dnf install espeak-ng');
+
+  const outFile = path.join(CACHE_DIR, `${hash}.wav`);
+  const cfg = loadConfig();
+
   let espeakVoice;
   if (voice.startsWith('pt')) espeakVoice = cfg.espeakPtVoice || 'pt-br';
   else espeakVoice = cfg.espeakEsVoice || 'es-mx';
@@ -212,13 +279,14 @@ function clearCache() {
   return n;
 }
 
+// ─── VOICE LIST ──────────────────────────────────────────
 let voicesCache = null;
 async function listVoices() {
   if (voicesCache) return voicesCache;
 
   const voices = [];
 
-  // Try msedge voices
+  // msedge voices
   try {
     const tts = new MsEdgeTTS();
     const all = await tts.getVoices();
@@ -238,7 +306,21 @@ async function listVoices() {
     console.log('[tts] Could not fetch msedge voices:', e.message);
   }
 
-  // Add espeak voices if available
+  // Piper voices (from installed models)
+  if (hasPiper()) {
+    for (const model of getPiperModels()) {
+      const locale = model.startsWith('pt_BR') ? 'pt-BR' : model.startsWith('es_MX') ? 'es-MX' : model.startsWith('es_') ? 'es' : model.split('-')[0].replace('_', '-');
+      voices.push({
+        shortName: `piper:${model}`,
+        locale: locale,
+        gender: 'Neural',
+        friendlyName: `Piper — ${model}`,
+        backend: 'piper'
+      });
+    }
+  }
+
+  // espeak-ng voices
   if (hasEspeak()) {
     voices.push(
       { shortName: 'pt-br', locale: 'pt-BR', gender: 'Male', friendlyName: 'espeak-ng Português BR', backend: 'espeak' },
@@ -256,6 +338,8 @@ async function listVoices() {
 function getBackendStatus() {
   return {
     espeakAvailable: hasEspeak(),
+    piperAvailable: hasPiper(),
+    piperModels: getPiperModels(),
     backend: loadConfig().backend || 'auto'
   };
 }

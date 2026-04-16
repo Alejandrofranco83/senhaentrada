@@ -224,9 +224,10 @@
 
       <div class="form-group mb-2">
         <label>Motor de voz</label>
-        <select id="voiceBackend" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:300px;">
-          <option value="auto">Auto (msedge con fallback a espeak-ng)</option>
+        <select id="voiceBackend" style="padding:0.5rem 0.75rem;border-radius:8px;border:2px solid var(--bg-surface);background:var(--bg);color:var(--text);width:380px;">
+          <option value="auto">Auto (msedge → piper → espeak-ng)</option>
           <option value="msedge">Solo Microsoft Edge Neural (requiere internet)</option>
+          <option value="piper">Solo Piper Neural (offline, alta calidad)</option>
           <option value="espeak">Solo espeak-ng (offline, menor calidad)</option>
         </select>
       </div>
