@@ -16,10 +16,11 @@ const DEFAULT_CONFIG = {
   esVoice: 'es-MX-DaliaNeural',
   piperPtModel: 'pt_BR-faber-medium',
   piperEsModel: 'es_MX-ald-medium',
+  piperLengthScale: 1.3,  // >1 = slower (1.0=normal, 1.3=lento, 1.6=muy lento)
   espeakPtVoice: 'pt-br',
   espeakEsVoice: 'es-mx',
   rate: '-15%',
-  espeakSpeed: 130
+  espeakSpeed: 120
 };
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
@@ -180,9 +181,12 @@ function doSynthesizePiper(text, voice, hash, opts) {
     throw new Error(`Piper model not found: ${modelName}.onnx`);
   }
 
+  const lengthScale = String(cfg.piperLengthScale || 1.3);
+
   return new Promise((resolve, reject) => {
     const proc = execFile(PIPER_BIN, [
       '--model', modelPath,
+      '--length_scale', lengthScale,
       '--output_file', outFile
     ], { timeout: 15000, env: { ...process.env, LD_LIBRARY_PATH: PIPER_DIR } }, (err) => {
       if (err) return reject(new Error('piper failed: ' + err.message));
@@ -225,11 +229,46 @@ function doSynthesizeEspeak(text, voice, hash, opts) {
 }
 
 // ─── TICKET SENTENCES ────────────────────────────────────
+const ES_DIGITS = {'0':'cero','1':'uno','2':'dos','3':'tres','4':'cuatro','5':'cinco','6':'seis','7':'siete','8':'ocho','9':'nueve'};
+const PT_DIGITS = {'0':'zero','1':'um','2':'dois','3':'três','4':'quatro','5':'cinco','6':'seis','7':'sete','8':'oito','9':'nove'};
+
+// Spell out prefix letters so TTS pronounces them naturally
+const ES_LETTERS = {
+  'A':'a','B':'be','C':'ce','D':'de','E':'e','F':'efe','G':'ge','H':'hache',
+  'I':'i','J':'jota','K':'ka','L':'ele','M':'eme','N':'ene','O':'o','P':'pe',
+  'Q':'cu','R':'erre','S':'ese','T':'te','U':'u','V':'uve','W':'doble uve',
+  'X':'equis','Y':'ye','Z':'zeta'
+};
+const PT_LETTERS = {
+  'A':'a','B':'bê','C':'cê','D':'dê','E':'e','F':'éfe','G':'gê','H':'agá',
+  'I':'i','J':'jota','K':'cá','L':'éle','M':'eme','N':'ene','O':'o','P':'pê',
+  'Q':'quê','R':'érre','S':'ésse','T':'tê','U':'u','V':'vê','W':'dáblio',
+  'X':'xis','Y':'ípsilon','Z':'zê'
+};
+
 function ticketSentence(code, counter, lang) {
-  const esNames = {'0':'cero','1':'uno','2':'dos','3':'tres','4':'cuatro','5':'cinco','6':'seis','7':'siete','8':'ocho','9':'nueve'};
-  const ptNames = {'0':'zero','1':'um','2':'dois','3':'três','4':'quatro','5':'cinco','6':'seis','7':'sete','8':'oito','9':'nove'};
-  const names = lang === 'pt' ? ptNames : esNames;
-  const spoken = String(code).split('').map(c => names[c] || c).join(' ');
+  const digits  = lang === 'pt' ? PT_DIGITS : ES_DIGITS;
+  const letters = lang === 'pt' ? PT_LETTERS : ES_LETTERS;
+
+  const chars = String(code).split('');
+  const parts = [];
+  for (const c of chars) {
+    if (digits[c]) parts.push(digits[c]);
+    else if (letters[c.toUpperCase()]) parts.push(letters[c.toUpperCase()]);
+    else parts.push(c);
+  }
+
+  // Join with comma between prefix letter(s) and digits for a clear pause
+  const firstDigit = chars.findIndex(c => /\d/.test(c));
+  let spoken;
+  if (firstDigit > 0) {
+    const letterPart = parts.slice(0, firstDigit).join(' ');
+    const digitPart  = parts.slice(firstDigit).join(', ');
+    spoken = `${letterPart}, ${digitPart}`;
+  } else {
+    spoken = parts.join(', ');
+  }
+
   if (lang === 'pt') return `Senha ${spoken}, dirija-se ao Caixa ${counter}`;
   return `Turno ${spoken}, diríjase a Caja ${counter}`;
 }

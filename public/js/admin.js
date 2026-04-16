@@ -947,6 +947,7 @@ async function loadVoiceConfig() {
     fillVoiceSelect('voicePtSelect', voicesList.filter(v => v.locale.startsWith('pt-BR') || v.locale.startsWith('pt')), cfg.ptVoice);
     fillVoiceSelect('voiceEsSelect', voicesList.filter(v => v.locale.startsWith('es')), cfg.esVoice);
     document.getElementById('voiceRate').value = cfg.rate || '-15%';
+    document.getElementById('voicePiperSpeed').value = String(cfg.piperLengthScale || 1.3);
 
     if (statusEl) statusEl.style.display = 'none';
   } catch (e) {
@@ -977,6 +978,9 @@ async function saveVoiceConfig(clearCache) {
   const esVoice = document.getElementById('voiceEsSelect').value;
   const rate    = document.getElementById('voiceRate').value;
   const backend = document.getElementById('voiceBackend').value;
+  const piperLengthScale = parseFloat(document.getElementById('voicePiperSpeed').value) || 1.3;
+  // Map piper scale to espeak WPM: scale 1.0→150, 1.3→120, 1.6→100, 1.8→90
+  const espeakSpeed = Math.round(150 / piperLengthScale);
   const statusEl = document.getElementById('voiceStatus');
   statusEl.style.display = 'block';
   statusEl.textContent = 'Guardando...';
@@ -985,7 +989,7 @@ async function saveVoiceConfig(clearCache) {
     const r = await fetch('/api/tts/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptVoice, esVoice, rate, backend, clearCache })
+      body: JSON.stringify({ ptVoice, esVoice, rate, backend, piperLengthScale, espeakSpeed, clearCache })
     }).then(r => r.json());
     statusEl.textContent = clearCache
       ? `Guardado. Cache limpiado: ${r.cleared} archivos eliminados.`
