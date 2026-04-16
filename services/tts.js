@@ -1,21 +1,39 @@
-// TTS service: synthesizes Microsoft Edge neural voices to MP3 and caches on disk.
-// Cache key = SHA1(voiceName + '|' + text). Once cached, no internet needed.
-
 const fs   = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execFile, execFileSync } = require('child_process');
 const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 
-const CACHE_DIR  = path.join(__dirname, '..', 'data', 'tts-cache');
+const CACHE_DIR   = path.join(__dirname, '..', 'data', 'tts-cache');
 const CONFIG_FILE = path.join(__dirname, '..', 'data', 'tts-config.json');
 
+// espeak-ng voice mappings
+const ESPEAK_VOICES = { pt: 'pt-br', es: 'es-mx' };
+
 const DEFAULT_CONFIG = {
+  backend: 'auto',  // 'auto' | 'msedge' | 'espeak'
   ptVoice: 'pt-BR-FranciscaNeural',
   esVoice: 'es-MX-DaliaNeural',
-  rate: '-15%'   // slower for clarity, matches old TTS rate 0.85
+  espeakPtVoice: 'pt-br',
+  espeakEsVoice: 'es-mx',
+  rate: '-15%',
+  espeakSpeed: 130   // words per minute (default ~175, lower = slower)
 };
 
 if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+
+// Detect espeak-ng availability
+let espeakAvailable = null;
+function hasEspeak() {
+  if (espeakAvailable !== null) return espeakAvailable;
+  try {
+    execFileSync('espeak-ng', ['--version'], { stdio: 'pipe', timeout: 3000 });
+    espeakAvailable = true;
+  } catch (e) {
+    espeakAvailable = false;
+  }
+  return espeakAvailable;
+}
 
 function loadConfig() {
   try {
@@ -36,28 +54,62 @@ function cacheKey(voice, text) {
   return crypto.createHash('sha1').update(`${voice}|${text}`).digest('hex');
 }
 
-function cachePath(voice, text) {
-  return path.join(CACHE_DIR, `${cacheKey(voice, text)}.mp3`);
+// Returns path with .mp3 or .wav depending on what exists
+function findCachedFile(voice, text) {
+  const hash = cacheKey(voice, text);
+  const mp3 = path.join(CACHE_DIR, `${hash}.mp3`);
+  if (fs.existsSync(mp3)) return mp3;
+  const wav = path.join(CACHE_DIR, `${hash}.wav`);
+  if (fs.existsSync(wav)) return wav;
+  return null;
 }
 
 function isCached(voice, text) {
-  return fs.existsSync(cachePath(voice, text));
+  return findCachedFile(voice, text) !== null;
 }
 
-// Serialize synthesis: msedge-tts opens a websocket per call; running many in parallel
-// can hit Microsoft's rate limits. Queue them.
+// ─── SYNTHESIS QUEUE ─────────────────────────────────────
 let synthChain = Promise.resolve();
 
 function synthesize(text, voice, opts = {}) {
-  const file = cachePath(voice, text);
-  if (fs.existsSync(file)) return Promise.resolve(file);
+  const cached = findCachedFile(voice, text);
+  if (cached) return Promise.resolve(cached);
 
-  const job = synthChain.then(() => doSynthesize(text, voice, file, opts));
-  synthChain = job.catch(() => {});  // never break the chain
+  const job = synthChain.then(() => doSynthesize(text, voice, opts));
+  synthChain = job.catch(() => {});
   return job;
 }
 
-async function doSynthesize(text, voice, outFile, opts) {
+function pickBackend() {
+  const cfg = loadConfig();
+  if (cfg.backend === 'msedge') return 'msedge';
+  if (cfg.backend === 'espeak') return 'espeak';
+  // 'auto': try msedge, fallback to espeak
+  return 'auto';
+}
+
+async function doSynthesize(text, voice, opts) {
+  const hash = cacheKey(voice, text);
+  const backend = pickBackend();
+
+  if (backend === 'msedge' || backend === 'auto') {
+    try {
+      return await doSynthesizeMsEdge(text, voice, hash, opts);
+    } catch (e) {
+      if (backend === 'msedge') throw e;
+      console.log(`[tts] msedge failed (${e.message}), falling back to espeak-ng`);
+    }
+  }
+
+  // espeak-ng fallback
+  if (!hasEspeak()) {
+    throw new Error('TTS no disponible: msedge falló y espeak-ng no está instalado. Instalar: sudo dnf install espeak-ng');
+  }
+  return doSynthesizeEspeak(text, voice, hash, opts);
+}
+
+async function doSynthesizeMsEdge(text, voice, hash, opts) {
+  const outFile = path.join(CACHE_DIR, `${hash}.mp3`);
   const tts = new MsEdgeTTS();
   try {
     await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
@@ -80,7 +132,32 @@ async function doSynthesize(text, voice, outFile, opts) {
   }
 }
 
-// Build the spoken sentence for a ticket call in PT or ES
+function doSynthesizeEspeak(text, voice, hash, opts) {
+  const outFile = path.join(CACHE_DIR, `${hash}.wav`);
+  const cfg = loadConfig();
+
+  // Map msedge voice names to espeak voices
+  let espeakVoice;
+  if (voice.startsWith('pt')) espeakVoice = cfg.espeakPtVoice || 'pt-br';
+  else espeakVoice = cfg.espeakEsVoice || 'es-mx';
+
+  const speed = String(cfg.espeakSpeed || 130);
+
+  return new Promise((resolve, reject) => {
+    execFile('espeak-ng', [
+      '-v', espeakVoice,
+      '-s', speed,
+      '-w', outFile,
+      text
+    ], { timeout: 10000 }, (err) => {
+      if (err) return reject(new Error('espeak-ng failed: ' + err.message));
+      if (!fs.existsSync(outFile)) return reject(new Error('espeak-ng produced no file'));
+      resolve(outFile);
+    });
+  });
+}
+
+// ─── TICKET SENTENCES ────────────────────────────────────
 function ticketSentence(code, counter, lang) {
   const esNames = {'0':'cero','1':'uno','2':'dos','3':'tres','4':'cuatro','5':'cinco','6':'seis','7':'siete','8':'ocho','9':'nueve'};
   const ptNames = {'0':'zero','1':'um','2':'dois','3':'três','4':'quatro','5':'cinco','6':'seis','7':'sete','8':'oito','9':'nove'};
@@ -98,8 +175,6 @@ function getTicketCacheStatus(code, counter) {
   };
 }
 
-// Fire-and-forget pre-generation when a ticket is created/called.
-// Both PT and ES so by the time the call is announced, files are ready.
 function preGenerateTicket(code, counter) {
   const cfg = loadConfig();
   for (const lang of ['pt', 'es']) {
@@ -124,12 +199,15 @@ function getTextAudio(text, lang) {
   return synthesize(text, voice);
 }
 
-// Clear cache (useful when switching voices)
+// ─── CACHE MANAGEMENT ────────────────────────────────────
 function clearCache() {
   if (!fs.existsSync(CACHE_DIR)) return 0;
   let n = 0;
   for (const f of fs.readdirSync(CACHE_DIR)) {
-    if (f.endsWith('.mp3')) { fs.unlinkSync(path.join(CACHE_DIR, f)); n++; }
+    if (f.endsWith('.mp3') || f.endsWith('.wav')) {
+      fs.unlinkSync(path.join(CACHE_DIR, f));
+      n++;
+    }
   }
   return n;
 }
@@ -137,22 +215,49 @@ function clearCache() {
 let voicesCache = null;
 async function listVoices() {
   if (voicesCache) return voicesCache;
+
+  const voices = [];
+
+  // Try msedge voices
   try {
     const tts = new MsEdgeTTS();
     const all = await tts.getVoices();
     try { tts.close(); } catch (e) {}
-    voicesCache = all
-      .filter(v => v.Locale.startsWith('pt-BR') || v.Locale.startsWith('es-'))
-      .map(v => ({
-        shortName: v.ShortName,
-        locale: v.Locale,
-        gender: v.Gender,
-        friendlyName: v.FriendlyName
-      }));
-    return voicesCache;
+    for (const v of all) {
+      if (v.Locale.startsWith('pt-BR') || v.Locale.startsWith('es-')) {
+        voices.push({
+          shortName: v.ShortName,
+          locale: v.Locale,
+          gender: v.Gender,
+          friendlyName: v.FriendlyName,
+          backend: 'msedge'
+        });
+      }
+    }
   } catch (e) {
-    return [];
+    console.log('[tts] Could not fetch msedge voices:', e.message);
   }
+
+  // Add espeak voices if available
+  if (hasEspeak()) {
+    voices.push(
+      { shortName: 'pt-br', locale: 'pt-BR', gender: 'Male', friendlyName: 'espeak-ng Português BR', backend: 'espeak' },
+      { shortName: 'pt-br+f2', locale: 'pt-BR', gender: 'Female', friendlyName: 'espeak-ng Português BR (fem)', backend: 'espeak' },
+      { shortName: 'es-mx', locale: 'es-MX', gender: 'Male', friendlyName: 'espeak-ng Español MX', backend: 'espeak' },
+      { shortName: 'es', locale: 'es', gender: 'Male', friendlyName: 'espeak-ng Español', backend: 'espeak' },
+      { shortName: 'es+f2', locale: 'es', gender: 'Female', friendlyName: 'espeak-ng Español (fem)', backend: 'espeak' }
+    );
+  }
+
+  if (voices.length > 0) voicesCache = voices;
+  return voices;
+}
+
+function getBackendStatus() {
+  return {
+    espeakAvailable: hasEspeak(),
+    backend: loadConfig().backend || 'auto'
+  };
 }
 
 module.exports = {
@@ -167,5 +272,6 @@ module.exports = {
   clearCache,
   listVoices,
   isCached,
-  cachePath
+  findCachedFile,
+  getBackendStatus
 };

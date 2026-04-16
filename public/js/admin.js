@@ -918,24 +918,45 @@ async function loadVoiceConfig() {
   if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Cargando voces...'; }
 
   try {
-    if (!voicesList) voicesList = await fetch('/api/tts/voices').then(r => r.json());
-    const cfg = await fetch('/api/tts/config').then(r => r.json());
+    const [voices, cfg, status] = await Promise.all([
+      voicesList || fetch('/api/tts/voices').then(r => r.json()),
+      fetch('/api/tts/config').then(r => r.json()),
+      fetch('/api/tts/status').then(r => r.json())
+    ]);
+    if (!voicesList) voicesList = voices;
 
-    fillVoiceSelect('voicePtSelect', voicesList.filter(v => v.locale.startsWith('pt-BR')), cfg.ptVoice);
-    fillVoiceSelect('voiceEsSelect', voicesList.filter(v => v.locale.startsWith('es-')),    cfg.esVoice);
+    // Backend info
+    const infoEl = document.getElementById('voiceBackendInfo');
+    const espeakOk = status.espeakAvailable;
+    infoEl.innerHTML = espeakOk
+      ? '<span style="color:var(--success);">&#10003;</span> espeak-ng disponible como fallback offline'
+      : '<span style="color:var(--warning);">&#9888;</span> espeak-ng no instalado. Para fallback offline: <code>sudo dnf install espeak-ng</code>';
+
+    const msedgeVoices = voicesList.filter(v => v.backend === 'msedge');
+    if (msedgeVoices.length === 0) {
+      infoEl.innerHTML += '<br><span style="color:var(--warning);">&#9888;</span> Voces Microsoft Edge no disponibles (sin internet o bloqueado)';
+    }
+
+    document.getElementById('voiceBackend').value = cfg.backend || 'auto';
+
+    fillVoiceSelect('voicePtSelect', voicesList.filter(v => v.locale.startsWith('pt-BR') || v.locale.startsWith('pt')), cfg.ptVoice);
+    fillVoiceSelect('voiceEsSelect', voicesList.filter(v => v.locale.startsWith('es')), cfg.esVoice);
     document.getElementById('voiceRate').value = cfg.rate || '-15%';
 
     if (statusEl) statusEl.style.display = 'none';
   } catch (e) {
-    if (statusEl) statusEl.textContent = '⚠ Error al cargar voces. ¿Hay internet en el servidor?';
+    if (statusEl) statusEl.textContent = 'Error al cargar voces: ' + e.message;
   }
 }
 
 function fillVoiceSelect(id, voices, selected) {
   const sel = document.getElementById(id);
-  sel.innerHTML = voices.map(v =>
-    `<option value="${v.shortName}" ${v.shortName === selected ? 'selected' : ''}>${v.locale} — ${v.gender} — ${v.shortName.replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '')}</option>`
-  ).join('');
+  sel.innerHTML = voices.map(v => {
+    const label = v.backend === 'espeak'
+      ? `${v.friendlyName}`
+      : `${v.locale} — ${v.gender} — ${v.shortName.replace(/^[a-z]{2}-[A-Z]{2}-/, '').replace(/Neural$/, '')}`;
+    return `<option value="${v.shortName}" ${v.shortName === selected ? 'selected' : ''}>${label}</option>`;
+  }).join('');
 }
 
 function previewVoice(lang) {
@@ -950,6 +971,7 @@ async function saveVoiceConfig(clearCache) {
   const ptVoice = document.getElementById('voicePtSelect').value;
   const esVoice = document.getElementById('voiceEsSelect').value;
   const rate    = document.getElementById('voiceRate').value;
+  const backend = document.getElementById('voiceBackend').value;
   const statusEl = document.getElementById('voiceStatus');
   statusEl.style.display = 'block';
   statusEl.textContent = 'Guardando...';
@@ -958,13 +980,13 @@ async function saveVoiceConfig(clearCache) {
     const r = await fetch('/api/tts/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ptVoice, esVoice, rate, clearCache })
+      body: JSON.stringify({ ptVoice, esVoice, rate, backend, clearCache })
     }).then(r => r.json());
     statusEl.textContent = clearCache
-      ? `✓ Guardado. Cache limpiado: ${r.cleared} archivos eliminados.`
-      : '✓ Guardado.';
+      ? `Guardado. Cache limpiado: ${r.cleared} archivos eliminados.`
+      : 'Guardado.';
   } catch (e) {
-    statusEl.textContent = '⚠ Error: ' + e.message;
+    statusEl.textContent = 'Error: ' + e.message;
   }
 }
 

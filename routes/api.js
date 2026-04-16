@@ -530,7 +530,8 @@ router.delete('/ads/:id', (req, res) => {
 
 // ─── TTS ─────────────────────────────────────────────────
 function sendTtsFile(res, filePath) {
-  res.set('Content-Type', 'audio/mpeg');
+  const ct = filePath.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg';
+  res.set('Content-Type', ct);
   res.set('Cache-Control', 'public, max-age=86400');
   res.sendFile(filePath);
 }
@@ -583,9 +584,13 @@ router.get('/tts/config', (req, res) => {
   res.json(tts.loadConfig());
 });
 
+router.get('/tts/status', (req, res) => {
+  res.json(tts.getBackendStatus());
+});
+
 router.post('/tts/config', (req, res) => {
-  const { ptVoice, esVoice, rate, clearCache } = req.body || {};
-  const cfg = tts.saveConfig({ ptVoice, esVoice, rate });
+  const { ptVoice, esVoice, rate, backend, espeakPtVoice, espeakEsVoice, espeakSpeed, clearCache } = req.body || {};
+  const cfg = tts.saveConfig({ ptVoice, esVoice, rate, backend, espeakPtVoice, espeakEsVoice, espeakSpeed });
   let cleared = 0;
   if (clearCache) cleared = tts.clearCache();
   res.json({ ...cfg, cleared });
