@@ -1,4 +1,4 @@
-const config = require('../config/default.json');
+const config = require('../config');
 const i18n = require('../config/i18n.json');
 
 /**
