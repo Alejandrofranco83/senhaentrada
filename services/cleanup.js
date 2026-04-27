@@ -1,4 +1,5 @@
 const { db } = require('../database/db');
+const { nowLocal } = require('./util');
 
 let cleanupHour = 0;  // default: midnight (00:00)
 let lastCleanupDate = null;
@@ -14,7 +15,7 @@ function setCleanupHour(hour) {
 
 function runDailyCleanup() {
   const today = new Date().toISOString().slice(0, 10);
-  const now   = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const now   = nowLocal();
 
   // Mark old waiting tickets as cancelled
   const cancelled = db.prepare(`

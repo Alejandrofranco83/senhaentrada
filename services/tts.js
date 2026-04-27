@@ -269,8 +269,8 @@ function ticketSentence(code, counter, lang) {
     spoken = parts.join(', ');
   }
 
-  if (lang === 'pt') return `Senha ${spoken}, dirija-se ao Caixa ${counter}`;
-  return `Turno ${spoken}, diríjase a Caja ${counter}`;
+  if (lang === 'pt') return `Senha ${spoken}, dirija-se ao Caixa, ${counter}`;
+  return `Turno ${spoken}, diríjase a Caja, ${counter}`;
 }
 
 function getTicketCacheStatus(code, counter) {

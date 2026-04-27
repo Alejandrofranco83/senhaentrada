@@ -1,4 +1,5 @@
 const { db } = require('../database/db');
+const { nowLocal } = require('./util');
 
 /**
  * Generate the next ticket code for a service (e.g., "F001")
@@ -122,7 +123,7 @@ function callNextTicket(counterId) {
   if (!ticket) return null;
 
   const counter = db.prepare('SELECT * FROM counters WHERE id = ?').get(counterId);
-  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const now = nowLocal();
 
   db.prepare(`
     UPDATE tickets SET status = 'called', counter_id = ?, called_at = ?, serving_operator_id = ? WHERE id = ?
@@ -148,7 +149,7 @@ function callNextTicket(counterId) {
  * Complete the current ticket
  */
 function completeTicket(ticketId) {
-  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const now = nowLocal();
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   if (!ticket) throw new Error('Ticket not found');
@@ -170,7 +171,7 @@ function completeTicket(ticketId) {
  * Mark ticket as no-show
  */
 function noShowTicket(ticketId) {
-  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const now = nowLocal();
 
   const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   if (!ticket) throw new Error('Ticket not found');

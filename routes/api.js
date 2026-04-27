@@ -7,6 +7,7 @@ const { db } = require('../database/db');
 const queue = require('../services/queue');
 const { printTicket } = require('../services/printer');
 const tts = require('../services/tts');
+const { nowLocal } = require('../services/util');
 
 // Multer config for announcement audio uploads
 const audioStorage = multer.diskStorage({
@@ -189,7 +190,7 @@ router.post('/counters/:id/close', (req, res) => {
 
   // Complete any active ticket on this counter
   if (counter && counter.current_ticket_id) {
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const now = nowLocal();
     db.prepare("UPDATE tickets SET status = 'completed', completed_at = ? WHERE id = ? AND status IN ('called','serving')")
       .run(now, counter.current_ticket_id);
     if (socketEmitter) {

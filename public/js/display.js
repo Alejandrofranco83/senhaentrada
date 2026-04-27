@@ -85,18 +85,32 @@ function hideAnnounce() {
   document.getElementById('ticketAnnounce').classList.remove('show');
 }
 
-// Called for every new ticket (and recalled)
-function triggerAnnounce(ticket) {
-  showAnnounce(ticket);
+// Serialized announcement queue: each ticket waits its turn, gets shown
+// for ANNOUNCE_DURATION AND for as long as its TTS takes (whichever ends last).
+const announceQueue = [];
+let processingAnnounceQueue = false;
 
-  clearTimeout(announceTimer);
-  announceTimer = setTimeout(() => {
-    hideAnnounce();
-    if (calledTickets.length > 0) setDisplayState('queue');
-    resetIdleReturnTimer();
-  }, ANNOUNCE_DURATION);
+function enqueueAnnounce(ticket) {
+  announceQueue.push(ticket);
+  if (!processingAnnounceQueue) processAnnounceQueue();
+}
 
-  if (displayState === 'queue') resetIdleReturnTimer();
+async function processAnnounceQueue() {
+  processingAnnounceQueue = true;
+  while (announceQueue.length > 0) {
+    const ticket = announceQueue.shift();
+    showAnnounce(ticket);
+    if (displayState === 'queue') resetIdleReturnTimer();
+
+    const minVisible = new Promise(r => setTimeout(r, ANNOUNCE_DURATION));
+    const ttsDone    = announceTicket(ticket).catch(() => {});
+
+    await Promise.all([minVisible, ttsDone]);
+  }
+  hideAnnounce();
+  if (calledTickets.length > 0) setDisplayState('queue');
+  resetIdleReturnTimer();
+  processingAnnounceQueue = false;
 }
 
 // ─── ADS CAROUSEL ────────────────────────────────────
@@ -206,15 +220,6 @@ function stopCurrentAnnouncement() {
   }
 }
 
-function stopCurrentTicket() {
-  if (currentTicketAudio) {
-    currentTicketAudio.pause();
-    currentTicketAudio.currentTime = 0;
-    currentTicketAudio = null;
-  }
-  isAnnouncingTicket = false;
-}
-
 // Play an MP3 from a URL; returns a promise resolved on `ended`
 function playAudioUrl(url) {
   return new Promise((resolve, reject) => {
@@ -228,8 +233,7 @@ function playAudioUrl(url) {
 // ─── TICKET CALL TTS ─────────────────────────────────
 async function announceTicket(ticket) {
   if (!audioActivated) return;
-  stopCurrentAnnouncement();   // ticket preempts any running announcement
-  stopCurrentTicket();          // and any in-flight ticket call
+  stopCurrentAnnouncement();   // ticket preempts any running ad announcement
   isAnnouncingTicket = true;
 
   const code = ticket.code;
@@ -271,8 +275,7 @@ socket.on('ticket:called', (ticket) => {
   calledTickets.unshift(ticket);
   if (calledTickets.length > MAX_CALLED) calledTickets = calledTickets.slice(0, MAX_CALLED);
   renderCalled();
-  triggerAnnounce(ticket);
-  announceTicket(ticket);
+  enqueueAnnounce(ticket);
 });
 
 socket.on('ticket:recalled', (ticket) => {
@@ -284,8 +287,7 @@ socket.on('ticket:recalled', (ticket) => {
       item.classList.add('highlight');
     }
   });
-  triggerAnnounce(ticket);
-  announceTicket(ticket);
+  enqueueAnnounce(ticket);
 });
 
 socket.on('ticket:completed', (ticket) => {
