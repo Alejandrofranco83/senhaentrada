@@ -348,7 +348,7 @@ async function listVoices() {
   // Piper voices (from installed models)
   if (hasPiper()) {
     for (const model of getPiperModels()) {
-      const locale = model.startsWith('pt_BR') ? 'pt-BR' : model.startsWith('es_MX') ? 'es-MX' : model.startsWith('es_') ? 'es' : model.split('-')[0].replace('_', '-');
+      const locale = model.startsWith('pt_BR') ? 'pt-BR' : model.startsWith('es_MX') ? 'es-MX' : model.startsWith('es_AR') ? 'es-AR' : model.startsWith('es_') ? 'es' : model.split('-')[0].replace('_', '-');
       voices.push({
         shortName: `piper:${model}`,
         locale: locale,

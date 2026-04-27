@@ -603,8 +603,8 @@ router.get('/tts/status', (req, res) => {
 });
 
 router.post('/tts/config', (req, res) => {
-  const { ptVoice, esVoice, rate, backend, espeakPtVoice, espeakEsVoice, espeakSpeed, clearCache } = req.body || {};
-  const cfg = tts.saveConfig({ ptVoice, esVoice, rate, backend, espeakPtVoice, espeakEsVoice, espeakSpeed });
+  const { ptVoice, esVoice, rate, backend, piperLengthScale, espeakPtVoice, espeakEsVoice, espeakSpeed, clearCache } = req.body || {};
+  const cfg = tts.saveConfig({ ptVoice, esVoice, rate, backend, piperLengthScale, espeakPtVoice, espeakEsVoice, espeakSpeed });
   let cleared = 0;
   if (clearCache) cleared = tts.clearCache();
   res.json({ ...cfg, cleared });

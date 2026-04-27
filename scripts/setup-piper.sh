@@ -21,7 +21,7 @@ echo ""
 if [ -f "$PIPER_DIR/piper" ]; then
   echo "[OK] piper binary ya existe"
 else
-  echo "[1/3] Descargando piper binary..."
+  echo "[1/4] Descargando piper binary..."
   cd "$PIPER_DIR"
   wget -q --show-progress "$PIPER_URL" -O piper.tar.gz
   tar xf piper.tar.gz --strip-components=1
@@ -34,7 +34,7 @@ fi
 if [ -f "$MODEL_DIR/pt_BR-faber-medium.onnx" ]; then
   echo "[OK] Voz PT-BR (faber-medium) ya existe"
 else
-  echo "[2/3] Descargando voz PT-BR (faber-medium, ~65MB)..."
+  echo "[2/4] Descargando voz PT-BR (faber-medium, ~65MB)..."
   wget -q --show-progress "$VOICES_BASE/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx" -O "$MODEL_DIR/pt_BR-faber-medium.onnx"
   wget -q "$VOICES_BASE/pt/pt_BR/faber/medium/pt_BR-faber-medium.onnx.json" -O "$MODEL_DIR/pt_BR-faber-medium.onnx.json"
   echo "[OK] Voz PT-BR instalada"
@@ -44,10 +44,20 @@ fi
 if [ -f "$MODEL_DIR/es_MX-ald-medium.onnx" ]; then
   echo "[OK] Voz ES-MX (ald-medium) ya existe"
 else
-  echo "[3/3] Descargando voz ES-MX (ald-medium, ~65MB)..."
+  echo "[3/4] Descargando voz ES-MX (ald-medium, ~65MB)..."
   wget -q --show-progress "$VOICES_BASE/es/es_MX/ald/medium/es_MX-ald-medium.onnx" -O "$MODEL_DIR/es_MX-ald-medium.onnx"
   wget -q "$VOICES_BASE/es/es_MX/ald/medium/es_MX-ald-medium.onnx.json" -O "$MODEL_DIR/es_MX-ald-medium.onnx.json"
   echo "[OK] Voz ES-MX instalada"
+fi
+
+# Download ES-AR voice (alternativa de Argentina, calidad high — sonido mas natural rioplatense)
+if [ -f "$MODEL_DIR/es_AR-daniela-high.onnx" ]; then
+  echo "[OK] Voz ES-AR (daniela-high) ya existe"
+else
+  echo "[4/4] Descargando voz ES-AR (daniela-high, ~110MB)..."
+  wget -q --show-progress "$VOICES_BASE/es/es_AR/daniela/high/es_AR-daniela-high.onnx" -O "$MODEL_DIR/es_AR-daniela-high.onnx"
+  wget -q "$VOICES_BASE/es/es_AR/daniela/high/es_AR-daniela-high.onnx.json" -O "$MODEL_DIR/es_AR-daniela-high.onnx.json"
+  echo "[OK] Voz ES-AR instalada"
 fi
 
 echo ""
