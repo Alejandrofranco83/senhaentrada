@@ -171,10 +171,15 @@ function doSynthesizePiper(text, voice, hash, opts) {
   const outFile = path.join(CACHE_DIR, `${hash}.wav`);
   const cfg = loadConfig();
 
-  // Resolve model: use configured model, or pick by language from voice name
+  // Resolve model: prefer the explicit voice (piper:<model>), else fall back by language
   let modelName;
-  if (voice.startsWith('pt')) modelName = cfg.piperPtModel || 'pt_BR-faber-medium';
-  else modelName = cfg.piperEsModel || 'es_MX-ald-medium';
+  if (typeof voice === 'string' && voice.startsWith('piper:')) {
+    modelName = voice.slice('piper:'.length);
+  } else if (typeof voice === 'string' && voice.startsWith('pt')) {
+    modelName = cfg.piperPtModel || 'pt_BR-faber-medium';
+  } else {
+    modelName = cfg.piperEsModel || 'es_MX-ald-medium';
+  }
 
   const modelPath = path.join(PIPER_MODELS, `${modelName}.onnx`);
   if (!fs.existsSync(modelPath)) {
@@ -208,8 +213,12 @@ function doSynthesizeEspeak(text, voice, hash, opts) {
   const outFile = path.join(CACHE_DIR, `${hash}.wav`);
   const cfg = loadConfig();
 
+  // Use the espeak voice id directly when given (e.g. "pt-br+f2", "es+f2"),
+  // otherwise fall back by language from the configured defaults.
+  const looksLikeEspeakId = typeof voice === 'string' && /^[a-z]{2,3}(-[a-z]{2,3})?(\+[a-z0-9]+)?$/i.test(voice);
   let espeakVoice;
-  if (voice.startsWith('pt')) espeakVoice = cfg.espeakPtVoice || 'pt-br';
+  if (looksLikeEspeakId) espeakVoice = voice;
+  else if (typeof voice === 'string' && voice.startsWith('pt')) espeakVoice = cfg.espeakPtVoice || 'pt-br';
   else espeakVoice = cfg.espeakEsVoice || 'es-mx';
 
   const speed = String(cfg.espeakSpeed || 130);

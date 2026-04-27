@@ -971,17 +971,39 @@ async function loadVoiceConfig() {
       : '<span style="color:var(--text-muted);">&#10007;</span> espeak-ng (offline): no instalado — <code>sudo dnf install espeak-ng</code>';
     infoEl.innerHTML = info;
 
-    document.getElementById('voiceBackend').value = cfg.backend || 'auto';
+    const backendSel = document.getElementById('voiceBackend');
+    backendSel.value = cfg.backend || 'auto';
+    backendSel.onchange = () => renderVoiceDropdowns();
 
-    fillVoiceSelect('voicePtSelect', voicesList.filter(v => v.locale.startsWith('pt-BR') || v.locale.startsWith('pt')), cfg.ptVoice);
-    fillVoiceSelect('voiceEsSelect', voicesList.filter(v => v.locale.startsWith('es')), cfg.esVoice);
     document.getElementById('voiceRate').value = cfg.rate || '-15%';
     document.getElementById('voicePiperSpeed').value = String(cfg.piperLengthScale || 1.3);
+
+    renderVoiceDropdowns({ pt: cfg.ptVoice, es: cfg.esVoice });
 
     if (statusEl) statusEl.style.display = 'none';
   } catch (e) {
     if (statusEl) statusEl.textContent = 'Error al cargar voces: ' + e.message;
   }
+}
+
+function renderVoiceDropdowns(preselect) {
+  const backend = document.getElementById('voiceBackend').value;
+  const compatible = (v) => backend === 'auto' || v.backend === backend;
+
+  // Keep the user's current pick across motor switches when possible
+  const currentPt = preselect?.pt ?? document.getElementById('voicePtSelect').value;
+  const currentEs = preselect?.es ?? document.getElementById('voiceEsSelect').value;
+
+  fillVoiceSelect(
+    'voicePtSelect',
+    voicesList.filter(v => (v.locale.startsWith('pt-BR') || v.locale.startsWith('pt')) && compatible(v)),
+    currentPt
+  );
+  fillVoiceSelect(
+    'voiceEsSelect',
+    voicesList.filter(v => v.locale.startsWith('es') && compatible(v)),
+    currentEs
+  );
 }
 
 function fillVoiceSelect(id, voices, selected) {
