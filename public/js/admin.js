@@ -1020,7 +1020,7 @@ function previewVoice(lang) {
   const sel   = document.getElementById(lang === 'pt' ? 'voicePtSelect' : 'voiceEsSelect');
   const voice = sel.value;
   const audio = document.getElementById('voicePreviewAudio');
-  audio.src = `/api/tts/preview?voice=${encodeURIComponent(voice)}&t=${Date.now()}`;
+  audio.src = `/api/tts/preview?voice=${encodeURIComponent(voice)}&lang=${lang}&t=${Date.now()}`;
   audio.play().catch((e) => alert('No se pudo reproducir: ' + e.message));
 }
 

@@ -577,9 +577,10 @@ router.get('/tts/text', async (req, res) => {
 });
 
 router.get('/tts/preview', async (req, res) => {
-  const { voice, text } = req.query;
+  const { voice, text, lang } = req.query;
   if (!voice) return res.status(400).json({ error: 'voice requerido' });
-  const sample = text || (voice.startsWith('pt-')
+  const isPt = lang ? lang === 'pt' : /(^pt[-_])|(:pt[-_])/i.test(voice);
+  const sample = text || (isPt
     ? 'Senha um dois três, dirija-se ao Caixa um'
     : 'Turno uno dos tres, diríjase a Caja uno');
   try {
