@@ -18,6 +18,15 @@ const io = new Server(server, {
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
+
+// Ads — long-lived cache so Smart TVs don't redownload videos on every loop.
+// Filenames already include a timestamp (`ad_<ms>_<rand>.<ext>`), so they're
+// effectively content-addressed; safe to cache aggressively.
+app.use('/img/ads', express.static(path.join(__dirname, 'public', 'img', 'ads'), {
+  maxAge: '30d',
+  immutable: true,
+}));
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/audio', express.static(path.join(__dirname, 'public', 'audio')));
 

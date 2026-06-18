@@ -149,46 +149,59 @@ function renderAds() {
   const empty = document.getElementById('adsEmpty');
 
   panel.querySelectorAll('.ad-slide').forEach(el => el.remove());
-
-  if (ads.length === 0) {
-    empty.style.display = 'flex';
-    return;
-  }
-
-  empty.style.display = 'none';
-
-  ads.forEach((ad, i) => {
-    const slide = document.createElement('div');
-    slide.className    = 'ad-slide';
-    slide.dataset.index = i;
-    slide.innerHTML = ad.type === 'video'
-      ? `<video src="/img/ads/${ad.filename}" muted playsinline preload="metadata"></video>`
-      : `<img src="/img/ads/${ad.filename}" alt="${ad.title}" loading="lazy">`;
-    panel.appendChild(slide);
-  });
+  empty.style.display = ads.length === 0 ? 'flex' : 'none';
 }
 
+// Build a single <ad-slide> for the given ad, swapping out the previous one.
+// Only the currently-playing ad lives in the DOM — prevents Smart TV memory
+// pressure from N concurrent <video> decoders.
 function showAd(index) {
   if (ads.length === 0) return;
 
   clearTimeout(adTimer);
-  document.querySelectorAll('.ad-slide').forEach(s => s.classList.remove('active'));
-
   currentAdIndex = ((index % ads.length) + ads.length) % ads.length;
-  const ad          = ads[currentAdIndex];
-  const activeSlide = document.querySelector(`.ad-slide[data-index="${currentAdIndex}"]`);
-  if (!activeSlide) return;
+  const ad = ads[currentAdIndex];
 
-  activeSlide.classList.add('active');
+  const panel = document.getElementById('adsPanel');
+  const prev  = panel.querySelector('.ad-slide');
+
+  const slide = document.createElement('div');
+  slide.className = 'ad-slide';
 
   if (ad.type === 'video') {
-    const video = activeSlide.querySelector('video');
-    if (!video) return;
-    video.currentTime = 0;
-    video.play().catch(() => {});
-    video.onended = () => showAd(currentAdIndex + 1);
+    const v = document.createElement('video');
+    v.src         = `/img/ads/${ad.filename}`;
+    v.muted       = true;
+    v.autoplay    = true;
+    v.playsInline = true;
+    v.preload     = 'auto';
+    // If play fails or stalls, skip to next so the carousel never freezes.
+    const advance = () => { if (panel.contains(slide)) showAd(currentAdIndex + 1); };
+    v.onended  = advance;
+    v.onerror  = advance;
+    v.onstalled = () => { adTimer = setTimeout(advance, 8000); };
+    slide.appendChild(v);
+    panel.appendChild(slide);
+    requestAnimationFrame(() => slide.classList.add('active'));
+    v.play().catch(advance);
   } else {
+    const img = document.createElement('img');
+    img.src = `/img/ads/${ad.filename}`;
+    img.alt = ad.title || '';
+    slide.appendChild(img);
+    panel.appendChild(slide);
+    requestAnimationFrame(() => slide.classList.add('active'));
     adTimer = setTimeout(() => showAd(currentAdIndex + 1), (ad.duration || 8) * 1000);
+  }
+
+  // Remove the previous slide after the fade so we never have >1 video decoder alive.
+  if (prev) {
+    prev.classList.remove('active');
+    setTimeout(() => {
+      const oldVideo = prev.querySelector('video');
+      if (oldVideo) { oldVideo.pause(); oldVideo.removeAttribute('src'); oldVideo.load(); }
+      prev.remove();
+    }, 1000);
   }
 }
 
