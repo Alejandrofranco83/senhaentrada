@@ -154,7 +154,9 @@ function renderAds() {
 
 // Build a single <ad-slide> for the given ad, swapping out the previous one.
 // Only the currently-playing ad lives in the DOM — prevents Smart TV memory
-// pressure from N concurrent <video> decoders.
+// pressure from N concurrent <video> decoders. El slide anterior queda visible
+// hasta que el nuevo está realmente listo (video reproduciendo / imagen
+// decodificada), así el cambio es sin hueco — nunca se ve el fondo/logo.
 function showAd(index) {
   if (ads.length === 0) return;
 
@@ -163,26 +165,64 @@ function showAd(index) {
   const ad = ads[currentAdIndex];
 
   const panel = document.getElementById('adsPanel');
-  const prev  = panel.querySelector('.ad-slide');
+
+  // Limpia slides pendientes que nunca llegaron a mostrarse (ej. video que
+  // no arrancó y saltamos por watchdog) — libera su decoder antes de seguir.
+  panel.querySelectorAll('.ad-slide:not(.active)').forEach(el => {
+    const sv = el.querySelector('video');
+    if (sv) { sv.pause(); sv.removeAttribute('src'); sv.load(); }
+    el.remove();
+  });
+  const prev = panel.querySelector('.ad-slide');
 
   const slide = document.createElement('div');
   slide.className = 'ad-slide';
 
+  let advanced = false;
+  const advance = () => {
+    if (advanced || !panel.contains(slide)) return;
+    advanced = true;
+    showAd(currentAdIndex + 1);
+  };
+
+  // Fade-in del slide nuevo + retiro del anterior, recién cuando el nuevo
+  // está listo. Libera el decoder viejo (pause+load) tras el fade.
+  const swapIn = () => {
+    requestAnimationFrame(() => slide.classList.add('active'));
+    if (prev) {
+      prev.classList.remove('active');
+      setTimeout(() => {
+        const oldVideo = prev.querySelector('video');
+        if (oldVideo) { oldVideo.pause(); oldVideo.removeAttribute('src'); oldVideo.load(); }
+        prev.remove();
+      }, 1000);
+    }
+  };
+
   if (ad.type === 'video') {
     const v = document.createElement('video');
-    v.src         = `/img/ads/${ad.filename}`;
     v.muted       = true;
     v.autoplay    = true;
     v.playsInline = true;
     v.preload     = 'auto';
-    // If play fails or stalls, skip to next so the carousel never freezes.
-    const advance = () => { if (panel.contains(slide)) showAd(currentAdIndex + 1); };
+    let swapped = false;
+    // Vigilante: si en 10s no llegó a reproducir, saltamos al siguiente.
+    // Cubre play() que nunca resuelve, buffering eterno y stalls sin evento.
+    let watchdog = setTimeout(advance, 10000);
+    v.addEventListener('playing', () => {
+      clearTimeout(watchdog);
+      if (!swapped) { swapped = true; swapIn(); }
+    });
     v.onended  = advance;
     v.onerror  = advance;
-    v.onstalled = () => { adTimer = setTimeout(advance, 8000); };
+    // Stall a mitad de reproducción: 8s de gracia; si retoma, 'playing' lo cancela.
+    v.onstalled = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(advance, 8000);
+    };
+    v.src = `/img/ads/${ad.filename}`;
     slide.appendChild(v);
-    panel.appendChild(slide);
-    requestAnimationFrame(() => slide.classList.add('active'));
+    panel.appendChild(slide);   // oculto (sin .active) detrás del slide actual
     v.play().catch(advance);
   } else {
     const img = document.createElement('img');
@@ -190,18 +230,9 @@ function showAd(index) {
     img.alt = ad.title || '';
     slide.appendChild(img);
     panel.appendChild(slide);
-    requestAnimationFrame(() => slide.classList.add('active'));
-    adTimer = setTimeout(() => showAd(currentAdIndex + 1), (ad.duration || 8) * 1000);
-  }
-
-  // Remove the previous slide after the fade so we never have >1 video decoder alive.
-  if (prev) {
-    prev.classList.remove('active');
-    setTimeout(() => {
-      const oldVideo = prev.querySelector('video');
-      if (oldVideo) { oldVideo.pause(); oldVideo.removeAttribute('src'); oldVideo.load(); }
-      prev.remove();
-    }, 1000);
+    // decode() espera la imagen lista; si falla (formato/red) igual mostramos.
+    const show = () => { swapIn(); adTimer = setTimeout(advance, (ad.duration || 8) * 1000); };
+    if (img.decode) { img.decode().then(show).catch(show); } else { show(); }
   }
 }
 
