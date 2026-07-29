@@ -157,6 +157,20 @@ function renderAds() {
 // pressure from N concurrent <video> decoders. El slide anterior queda visible
 // hasta que el nuevo está realmente listo (video reproduciendo / imagen
 // decodificada), así el cambio es sin hueco — nunca se ve el fondo/logo.
+//
+// Modo lite (/display?lite=1): para Smart TVs de gama baja con UN solo
+// decodificador de hardware — el video anterior se libera POR COMPLETO antes
+// de cargar el siguiente (nunca dos decoders, ni por un instante). El costo
+// es un hueco breve con el fondo entre videos; el beneficio es que la TV no
+// rompe el decoder (síntoma: pantalla verde).
+const LITE_MODE = new URLSearchParams(window.location.search).has('lite');
+
+function releaseSlide(el) {
+  const sv = el.querySelector('video');
+  if (sv) { sv.pause(); sv.removeAttribute('src'); sv.load(); }
+  el.remove();
+}
+
 function showAd(index) {
   if (ads.length === 0) return;
 
@@ -168,11 +182,15 @@ function showAd(index) {
 
   // Limpia slides pendientes que nunca llegaron a mostrarse (ej. video que
   // no arrancó y saltamos por watchdog) — libera su decoder antes de seguir.
-  panel.querySelectorAll('.ad-slide:not(.active)').forEach(el => {
-    const sv = el.querySelector('video');
-    if (sv) { sv.pause(); sv.removeAttribute('src'); sv.load(); }
-    el.remove();
-  });
+  panel.querySelectorAll('.ad-slide:not(.active)').forEach(releaseSlide);
+
+  // Lite: si el slide anterior es un video, liberarlo POR COMPLETO antes de
+  // tocar el próximo (las imágenes no ocupan el decoder — esas siguen suaves).
+  if (LITE_MODE) {
+    panel.querySelectorAll('.ad-slide').forEach(el => {
+      if (el.querySelector('video')) releaseSlide(el);
+    });
+  }
   const prev = panel.querySelector('.ad-slide');
 
   const slide = document.createElement('div');
@@ -186,16 +204,16 @@ function showAd(index) {
   };
 
   // Fade-in del slide nuevo + retiro del anterior, recién cuando el nuevo
-  // está listo. Libera el decoder viejo (pause+load) tras el fade.
+  // está listo. El video viejo se PAUSA al instante (suelta el pipeline de
+  // decodificación — clave en TVs con un solo decoder; el frame congelado
+  // sigue visible durante el fade) y se libera del todo tras el fade.
   const swapIn = () => {
     requestAnimationFrame(() => slide.classList.add('active'));
     if (prev) {
+      const oldVideo = prev.querySelector('video');
+      if (oldVideo) oldVideo.pause();
       prev.classList.remove('active');
-      setTimeout(() => {
-        const oldVideo = prev.querySelector('video');
-        if (oldVideo) { oldVideo.pause(); oldVideo.removeAttribute('src'); oldVideo.load(); }
-        prev.remove();
-      }, 1000);
+      setTimeout(() => releaseSlide(prev), 1000);
     }
   };
 
